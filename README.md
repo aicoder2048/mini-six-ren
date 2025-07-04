@@ -54,9 +54,10 @@ uv run src/cli.py
 
 ## 核心依赖
 
+- `pydantic-ai` - 现代化AI集成框架，支持多LLM提供商
 - `lunardate` - 纯Python中国农历库（替代sxtwl以支持ARM64架构）
-- `openai` - AI智能解读（可选）
-- `rich` - 终端UI美化
+- `openai` - OpenAI API支持（可选）
+- `rich` - 终端UI美化和流式显示
 - `python-dotenv` - 环境变量管理
 
 ### 依赖变更说明
@@ -70,10 +71,13 @@ uv run src/cli.py
 ## 使用方法
 
 ### 1. 小六壬占卜
-启动应用后选择"小六壬占卜"，然后选择输入方式：
-- **数字输入**: 输入三个数字（如：1,2,3）
-- **日期输入**: 输入公历日期和时间
-- **汉字输入**: 输入三个汉字，系统自动计算笔画
+启动应用后选择"小六壬占卜"，然后：
+1. **选择AI模型**（如有多个可用）- 自动检测可用的OpenAI或DeepSeek模型
+2. **选择输入方式**：
+   - **数字输入**: 输入三个数字（如：1,2,3）
+   - **日期输入**: 输入公历日期和时间
+   - **汉字输入**: 输入三个汉字，系统自动计算笔画
+3. **实时观看AI解读生成过程**
 
 ### 2. 八字测算
 选择"八字测算"，输入：
@@ -92,16 +96,41 @@ uv run src/cli.py
 ### AI功能配置（可选）
 如需使用AI智能解读功能，请：
 1. 创建`.env`文件
-2. 添加OpenAI API密钥：
+2. 添加至少一个AI模型的API密钥：
    ```
-   OPENAI_API_KEY=your_api_key_here
+   # OpenAI GPT-4o (推荐)
+   OPENAI_API_KEY=your_openai_api_key_here
+   
+   # DeepSeek Chat (可选)
+   DEEPSEEK_API_KEY=your_deepseek_api_key_here
    ```
+
+### 支持的AI模型
+
+应用支持以下AI模型进行占卜解读：
+
+#### OpenAI GPT-4o
+- **模型标识**：`openai:gpt-4o`
+- **API密钥**：`OPENAI_API_KEY`
+- **特点**：高质量解读，响应准确
+
+#### DeepSeek Chat
+- **模型标识**：`deepseek:deepseek-chat`
+- **API密钥**：`DEEPSEEK_API_KEY`
+- **特点**：经济实惠，支持中文优化
+
+**智能模型选择**：
+- 应用会自动检测可用的模型
+- 如果只有一个模型可用，会自动选择
+- 如果有多个模型可用，会显示选择菜单
+- 未设置任何API密钥时会显示配置提示
 
 ## 项目结构
 
 ```
 ├── src/
 │   ├── cli.py              # 主CLI界面
+│   ├── ai_agent.py         # AI代理和模型管理
 │   ├── bagua.py           # 八卦相关
 │   ├── celestial_stems_earthly_branches.py  # 天干地支
 │   ├── five_elements.py   # 五行系统
