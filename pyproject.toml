@@ -9,4 +9,5 @@ dependencies = [
     "rich",
     "python-dotenv",
     "lunardate>=0.2.2",
+    "pydantic-ai>=0.3.5",
 ]
