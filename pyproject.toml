@@ -1,0 +1,12 @@
+[project]
+name = "mini-six-ren"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "openai",
+    "rich",
+    "python-dotenv",
+    "lunardate>=0.2.2",
+]
