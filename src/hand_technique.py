@@ -1,20 +1,20 @@
 from symbols import SYMBOLS
 from rich.table import Table
 from rich import box
-from ai_agent import DivinationAgent
+from ai_agent import DivinationAgent, SupportedModels
 
 class HandTechnique:
     def __init__(self):
         self.ai_agent = DivinationAgent()
     
     @staticmethod
-    def predict(num1, num2, num3, question=None):
+    def predict(num1, num2, num3, question=None, model_type=SupportedModels.OPENAI_GPT4O):
         symbols = HandTechnique.__generate_prediction(num1, num2, num3)
         table = HandTechnique.__format_prediction(symbols)
         
         interpretation = None
         if question:
-            ai_agent = DivinationAgent()
+            ai_agent = DivinationAgent(model_type)
             interpretation = ai_agent.interpret_prediction(symbols, question)
         
         return table, interpretation

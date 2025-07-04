@@ -1,4 +1,5 @@
 from hand_technique import HandTechnique
+from ai_agent import DivinationAgent, SupportedModels
 from five_elements import FIVE_ELEMENTS
 from utils.calendar_converter import solar_to_lunar, calculate_bazi, analyze_wuxing, format_bazi_output
 from utils.stroke_count import get_stroke_counts, format_stroke_count_output
@@ -366,12 +367,54 @@ def main():
         elif choice == 3:
             tools_submenu()
 
+def select_llm_model():
+    """选择LLM模型"""
+    available_models = DivinationAgent.get_available_models()
+    
+    if not available_models:
+        console.print("[bold red]错误：未检测到任何可用的LLM模型！[/bold red]")
+        console.print("[yellow]请确保已在.env文件中设置以下至少一个API密钥：[/yellow]")
+        for model in SupportedModels:
+            api_key_name = SupportedModels.get_api_key_name(model)
+            model_name = SupportedModels.get_display_name(model)
+            console.print(f"  - {api_key_name} (用于{model_name})")
+        return None
+    
+    if len(available_models) == 1:
+        # 只有一个模型可用，直接使用
+        model = available_models[0]
+        model_name = SupportedModels.get_display_name(model)
+        console.print(f"[cyan]当前可用模型：{model_name}[/cyan]")
+        return model
+    
+    # 显示模型选择菜单
+    console.print("\n")
+    model_names = [SupportedModels.get_display_name(model) for model in available_models]
+    display_menu(model_names, "请选择AI模型", level=2)
+    
+    choice = get_menu_choice(model_names, level=2)
+    if choice == 'home':
+        return None
+    elif isinstance(choice, int) and 1 <= choice <= len(available_models):
+        selected_model = available_models[choice - 1]
+        model_name = SupportedModels.get_display_name(selected_model)
+        console.print(f"[green]已选择：{model_name}[/green]")
+        return selected_model
+    
+    return None
+
 def xiaoliu_submenu():
     while True:
         console.print("\n")
         display_menu(["输入三个数字", "输入公历日期", "输入三个汉字"], "小六壬占卜", level=2)
         sub_choice = get_menu_choice(["输入三个数字", "输入公历日期", "输入三个汉字"], level=2)
         if sub_choice == 'home':
+            return
+        
+        # 选择LLM模型
+        selected_model = select_llm_model()
+        if selected_model is None:
+            console.print("[yellow]未选择模型，返回主菜单[/yellow]")
             return
         elif sub_choice == 1:
             while True:
@@ -416,8 +459,8 @@ def xiaoliu_submenu():
         # 获取用户的具体求问事项
         question = Prompt.ask("[bold cyan]请描述您想占卜的具体事项[/bold cyan]")
 
-        # 使用生成的数字进行小六壬占卜
-        table, interpretation = HandTechnique.predict(num1, num2, num3, question)
+        # 使用生成的数字进行小六壬占卜，传入选择的模型
+        table, interpretation = HandTechnique.predict(num1, num2, num3, question, selected_model)
         
         # 显示占卜结果解读
         display_divination_result(table, interpretation)

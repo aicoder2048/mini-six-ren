@@ -7,24 +7,72 @@ import asyncio
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.live import Live
+from enum import Enum
+from typing import Optional
+
+
+class SupportedModels(Enum):
+    """支持的LLM模型枚举"""
+    OPENAI_GPT4O = "openai:gpt-4o"
+    DEEPSEEK_CHAT = "deepseek:deepseek-chat"
+    
+    @classmethod
+    def get_display_name(cls, model):
+        """获取模型的显示名称"""
+        names = {
+            cls.OPENAI_GPT4O: "OpenAI GPT-4o",
+            cls.DEEPSEEK_CHAT: "DeepSeek Chat"
+        }
+        return names.get(model, model.value)
+    
+    @classmethod
+    def get_api_key_name(cls, model):
+        """获取模型对应的API密钥环境变量名"""
+        keys = {
+            cls.OPENAI_GPT4O: "OPENAI_API_KEY",
+            cls.DEEPSEEK_CHAT: "DEEPSEEK_API_KEY"
+        }
+        return keys.get(model, "")
 
 
 @dataclass
 class DivinationDeps:
     """占卜AI依赖数据类"""
-    openai_api_key: str
+    api_key: str
+    model_type: SupportedModels
 
 
 class DivinationAgent:
     """小六壬占卜AI解读代理"""
     
-    def __init__(self):
+    def __init__(self, model_type: SupportedModels = SupportedModels.OPENAI_GPT4O):
         load_dotenv()
+        self.model_type = model_type
         self.agent = Agent(
-            'openai:gpt-4o',
+            model_type.value,
             deps_type=DivinationDeps,
             system_prompt=self._get_system_prompt()
         )
+    
+    @classmethod
+    def get_available_models(cls) -> list[SupportedModels]:
+        """获取当前环境中可用的模型列表"""
+        load_dotenv()
+        available = []
+        
+        for model in SupportedModels:
+            api_key_name = SupportedModels.get_api_key_name(model)
+            if os.getenv(api_key_name):
+                available.append(model)
+        
+        return available
+    
+    @classmethod
+    def is_model_available(cls, model: SupportedModels) -> bool:
+        """检查指定模型是否可用（API密钥是否设置）"""
+        load_dotenv()
+        api_key_name = SupportedModels.get_api_key_name(model)
+        return bool(os.getenv(api_key_name))
     
     def _get_system_prompt(self) -> str:
         """获取系统提示词"""
@@ -45,11 +93,14 @@ class DivinationAgent:
         Returns:
             str: AI解读结果
         """
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            return "错误：未设置OPENAI_API_KEY环境变量"
+        api_key_name = SupportedModels.get_api_key_name(self.model_type)
+        api_key = os.getenv(api_key_name)
         
-        deps = DivinationDeps(openai_api_key=api_key)
+        if not api_key:
+            model_name = SupportedModels.get_display_name(self.model_type)
+            return f"错误：未设置{api_key_name}环境变量，无法使用{model_name}"
+        
+        deps = DivinationDeps(api_key=api_key, model_type=self.model_type)
         prompt = self._generate_interpretation_prompt(symbols, question)
         
         try:
@@ -57,7 +108,8 @@ class DivinationAgent:
             return asyncio.run(self._stream_interpretation(prompt, deps))
             
         except Exception as e:
-            return f"AI解读出错：{str(e)}"
+            model_name = SupportedModels.get_display_name(self.model_type)
+            return f"{model_name}解读出错：{str(e)}"
     
     async def _stream_interpretation(self, prompt: str, deps: DivinationDeps) -> str:
         """异步流式处理AI解读"""
@@ -65,7 +117,8 @@ class DivinationAgent:
         full_response = ""
         
         # 显示开始提示
-        console.print("\n[bold cyan]正在生成AI解读...[/bold cyan]")
+        model_name = SupportedModels.get_display_name(self.model_type)
+        console.print(f"\n[bold cyan]正在使用{model_name}生成AI解读...[/bold cyan]")
         
         try:
             async with self.agent.run_stream(
@@ -73,20 +126,20 @@ class DivinationAgent:
                 deps=deps,
                 model_settings={'max_tokens': 1000}
             ) as result:
-                console.print("[bold cyan]AI解读结果：[/bold cyan]")
+                console.print(f"[bold cyan]{model_name}解读结果：[/bold cyan]")
                 
                 # 使用简单的打印方式避免Live冲突
                 async for message in result.stream_text():
                     full_response = message
                     # 清屏并显示当前内容
                     console.clear()
-                    console.print("[bold cyan]AI解读结果：[/bold cyan]")
+                    console.print(f"[bold cyan]{model_name}解读结果：[/bold cyan]")
                     console.print(self._clean_markdown(full_response))
                 
                 console.print("\n[bold green]解读完成！[/bold green]")
                 
         except Exception as e:
-            console.print(f"\n[bold red]解读失败：{str(e)}[/bold red]")
+            console.print(f"\n[bold red]{model_name}解读失败：{str(e)}[/bold red]")
             raise
         
         return self._clean_markdown(full_response)
