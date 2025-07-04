@@ -77,9 +77,13 @@ class DivinationAgent:
     def _get_system_prompt(self) -> str:
         """获取系统提示词"""
         return (
-            "You are an expert in Chinese divination, specifically in interpreting "
-            "小六壬 (Xiao Liu Ren) results. Provide a concise interpretation in Chinese. "
-            "Your response should be professional, culturally appropriate, and limited to 1000 characters."
+            "你是一位精通小六壬占卜的大师，具有深厚的传统文化功底。你的职责是：\n"
+            "1. 仔细理解求问者的具体问题和关切\n"
+            "2. 深入分析三传符号的含义和五行关系\n"
+            "3. 将占卜结果与求问事项紧密结合，提供针对性解读\n"
+            "4. 避免泛泛而谈，要针对具体问题给出具体指导\n"
+            "5. 语言要优雅含蓄，富有哲理，但让现代人容易理解\n"
+            "请始终围绕求问者的具体问题进行解读，字数控制在1000字以内。"
         )
     
     def interpret_prediction(self, symbols, question: str) -> str:
@@ -155,43 +159,52 @@ class DivinationAgent:
     
     def _generate_interpretation_prompt(self, symbols, question: str) -> str:
         """生成解读提示词"""
-        prompt = f"尊敬的小六壬大师，请为以下问题进行占卜解读：'{question}'\n\n"
-        prompt += "三传结果如下：\n\n"
+        prompt = f"【重要】求问事项：{question}\n"
+        prompt += "请您务必围绕此具体问题进行解读，避免泛泛而谈。\n\n"
+        
+        prompt += "=== 三传占卜结果 ===\n"
 
         for i, symbol in enumerate(symbols):
             position = ["初传（前期）", "中传（中期）", "末传（后期）"][i]
-            prompt += f"{position}:\n"
-            prompt += f"符号: {symbol.name}\n"
-            prompt += f"描述: {symbol.description}\n"
-            prompt += f"解释: {symbol.interpretation}\n"
-            prompt += f"五行: {symbol.element.name}\n"
-            prompt += f"方位: {symbol.direction}\n"
-            prompt += f"神灵: {symbol.deity} - {symbol.deity_description}\n\n"
+            prompt += f"\n{position}：\n"
+            prompt += f"• 符号：{symbol.name}\n"
+            prompt += f"• 描述：{symbol.description}\n"
+            prompt += f"• 解释：{symbol.interpretation}\n"
+            prompt += f"• 五行：{symbol.element.name}\n"
+            prompt += f"• 方位：{symbol.direction}\n"
+            prompt += f"• 神灵：{symbol.deity} - {symbol.deity_description}\n"
 
         # 添加明确的五行属性和生克关系
-        prompt += "三传五行属性及关系：\n"
+        prompt += "\n=== 五行生克关系 ===\n"
         prompt += f"初传五行：{symbols[0].element.name}\n"
         prompt += f"中传五行：{symbols[1].element.name}\n"
-        prompt += f"末传五行：{symbols[2].element.name}\n"
+        prompt += f"末传五行：{symbols[2].element.name}\n\n"
 
         relations = self._get_relations(symbols)
-        prompt += f"初传{'【生】' if relations[0] == '生' else '【克】' if relations[0] == '克' else '和'}中传{'五行没有生或克的关系' if relations[0] == '无' else ''}\n"
-        prompt += f"中传{'【生】' if relations[1] == '生' else '【克】' if relations[1] == '克' else '和'}末传{'五行没有生或克的关系' if relations[1] == '无' else ''}\n\n"
+        prompt += f"初传→中传：{relations[0]}（{symbols[0].element.name}{'生' if relations[0] == '生' else '克' if relations[0] == '克' else '与'}{symbols[1].element.name}）\n"
+        prompt += f"中传→末传：{relations[1]}（{symbols[1].element.name}{'生' if relations[1] == '生' else '克' if relations[1] == '克' else '与'}{symbols[2].element.name}）\n\n"
 
-        prompt += "请您运用您渊博的小六壬知识，对这三个符号进行全面而深入的解读：\n"
-        prompt += "1. 请分析三传之间的关系，解释它们如何相互影响和演变。\n"
-        prompt += "2. 结合问题的具体内容，阐述这些符号对求问者当前处境的启示。\n"
+        prompt += "=== 解读要求 ===\n"
+        prompt += f"请紧密结合求问事项「{question}」，进行以下分析：\n\n"
+        prompt += f"1. **针对性分析**：这三传结果对于「{question}」这个具体问题意味着什么？请直接回应求问者的关切。\n\n"
+        prompt += "2. **时间发展脉络**：\n"
+        prompt += f"   - 初传（当前/近期）：{symbols[0].name}对此事的影响\n"
+        prompt += f"   - 中传（中期发展）：{symbols[1].name}如何推动事态变化\n"
+        prompt += f"   - 末传（最终结果）：{symbols[2].name}预示的最终走向\n\n"
+        
         if relations[0] != '无' or relations[1] != '无':
-            prompt += "3. 请结合求问的事情和三传的符号，详细解释以下五行生克关系如何影响事态的发展：\n"
+            prompt += "3. **五行影响机制**：结合求问事项，解释五行生克如何具体影响这件事的发展：\n"
             if relations[0] != '无':
-                prompt += f"   - 初传{relations[0]}中传的影响\n"
+                prompt += f"   - {symbols[0].element.name}{relations[0]}{symbols[1].element.name}：对此事态发展的推动/阻碍作用\n"
             if relations[1] != '无':
-                prompt += f"   - 中传{relations[1]}末传的影响\n"
+                prompt += f"   - {symbols[1].element.name}{relations[1]}{symbols[2].element.name}：对最终结果的影响机制\n"
         else:
-            prompt += "3. 三传之间没有五行的生克关系，请仅分析符号本身的含义及其对求问事项的影响，不要讨论或臆测任何五行相关的影响。\n"
-        prompt += "4. 基于您的解读，请提供具体的建议或化解之策，指导求问者如何趋吉避凶。\n"
-        prompt += "5. 如果有任何需要特别注意的方位、时间或相关神灵，请一并点明。\n\n"
-        prompt += "请以中国传统文化的智慧精髓来回答，语言要优雅含蓄，富有哲理，同时也要让现代人容易理解。字数控制在1000字以内。"
+            prompt += "3. **符号启示**：三传间无明显五行生克，请重点分析各符号本身对此问题的指导意义。\n"
+        
+        prompt += "\n4. **具体建议**：基于以上分析，针对这个具体问题给出实用的行动指导和注意事项。\n\n"
+        prompt += "5. **关键提示**：如有特别需要注意的时间、方位、或神灵护佑，请一并说明。\n\n"
+        
+        prompt += "【重要提醒】请始终围绕求问事项进行解读，将抽象的占卜符号与具体问题紧密结合，给出有针对性的指导。"
 
         return prompt
     
