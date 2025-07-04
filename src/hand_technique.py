@@ -96,7 +96,7 @@ class HandTechnique:
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are an expert in Chinese divination, specifically in interpreting 小六壬 (Xiao Liu Ren) results. Provide a concise interpretation in no more than 500 characters."},
+                {"role": "system", "content": "You are an expert in Chinese divination, specifically in interpreting 小六壬 (Xiao Liu Ren) results. Provide a concise interpretation in Chinese."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=500

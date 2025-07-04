@@ -36,8 +36,9 @@ Mini Six Ren（小六壬）是一个集成了多种中国传统文化元素的�
 ## 安装和运行
 
 ### 环境要求
-- Python 3.8+
+- Python 3.13+
 - uv 包管理器
+- 支持所有平台：Windows、macOS (Intel/ARM64)、Linux
 
 ### 安装依赖
 ```bash
@@ -53,10 +54,18 @@ uv run src/cli.py
 
 ## 核心依赖
 
-- `sxtwl` - 中国传统历法计算库
+- `lunardate` - 纯Python中国农历库（替代sxtwl以支持ARM64架构）
 - `openai` - AI智能解读（可选）
 - `rich` - 终端UI美化
 - `python-dotenv` - 环境变量管理
+
+### 依赖变更说明
+
+**从sxtwl迁移到lunardate**：
+- 原因：sxtwl库在Apple Silicon (ARM64) 架构上编译失败
+- 解决方案：使用纯Python的lunardate库替代
+- 功能影响：农历转换和八字计算功能完全保留，使用简化算法
+- 兼容性：支持所有平台架构，包括ARM64/M1/M2/M3 Mac
 
 ## 使用方法
 
