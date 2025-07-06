@@ -115,6 +115,35 @@ class DivinationAgent:
             model_name = SupportedModels.get_display_name(self.model_type)
             return f"{model_name}解读出错：{str(e)}"
     
+    async def interpret_prediction_async(self, symbols, question: str) -> str:
+        """
+        异步版本的AI解读方法，用于Web界面
+        
+        Args:
+            symbols: 三传符号列表
+            question: 用户问题
+            
+        Returns:
+            str: AI解读结果
+        """
+        api_key_name = SupportedModels.get_api_key_name(self.model_type)
+        api_key = os.getenv(api_key_name)
+        
+        if not api_key:
+            model_name = SupportedModels.get_display_name(self.model_type)
+            return f"错误：未设置{api_key_name}环境变量，无法使用{model_name}"
+        
+        deps = DivinationDeps(api_key=api_key, model_type=self.model_type)
+        prompt = self._generate_interpretation_prompt(symbols, question)
+        
+        try:
+            # 直接调用异步流式响应方法
+            return await self._stream_interpretation_web(prompt, deps)
+            
+        except Exception as e:
+            model_name = SupportedModels.get_display_name(self.model_type)
+            return f"{model_name}解读出错：{str(e)}"
+    
     async def _stream_interpretation(self, prompt: str, deps: DivinationDeps) -> str:
         """异步流式处理AI解读"""
         console = Console()
@@ -144,6 +173,24 @@ class DivinationAgent:
                 
         except Exception as e:
             console.print(f"\n[bold red]{model_name}解读失败：{str(e)}[/bold red]")
+            raise
+        
+        return self._clean_markdown(full_response)
+    
+    async def _stream_interpretation_web(self, prompt: str, deps: DivinationDeps) -> str:
+        """异步流式处理AI解读 - Web版本（无控制台输出）"""
+        full_response = ""
+        
+        try:
+            async with self.agent.run_stream(
+                prompt, 
+                deps=deps,
+                model_settings={'max_tokens': 1000}
+            ) as result:
+                async for message in result.stream_text():
+                    full_response = message
+                
+        except Exception:
             raise
         
         return self._clean_markdown(full_response)

@@ -18,6 +18,19 @@ class HandTechnique:
             interpretation = ai_agent.interpret_prediction(symbols, question)
         
         return table, interpretation
+    
+    @staticmethod
+    async def predict_async(num1, num2, num3, question=None, model_type=SupportedModels.OPENAI_GPT4O):
+        """异步版本的预测方法，用于Web界面"""
+        symbols = HandTechnique.__generate_prediction(num1, num2, num3)
+        table = HandTechnique.__format_prediction(symbols)
+        
+        interpretation = None
+        if question:
+            ai_agent = DivinationAgent(model_type)
+            interpretation = await ai_agent.interpret_prediction_async(symbols, question)
+        
+        return table, interpretation
 
     @staticmethod
     def __calculate_symbol(start_position, steps):
