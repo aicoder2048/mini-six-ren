@@ -273,22 +273,24 @@ class DivinationWebApp:
                         ui.icon('psychology', size='2rem').classes('text-white')
                         ui.label('AI 智慧解读').classes('text-2xl font-bold text-white')
                 
-                # Content
+                # Content with enhanced styling
                 with ui.card_section().classes('p-8'):
                     cleaned_result = self._clean_ai_result(ai_result)
-                    ui.markdown(cleaned_result).classes('prose prose-invert max-w-none text-gray-300')
+                    ui.markdown(cleaned_result).classes('ai-interpretation prose prose-invert max-w-none')
     
     def _clean_ai_result(self, text: str) -> str:
-        """Clean and format AI result text"""
+        """Clean and format AI result text for web display"""
         if not text:
             return ""
         
-        # Remove excessive markdown formatting that might not render well
-        # Keep basic formatting but clean up
-        text = re.sub(r'\*\*\*+', '**', text)  # Reduce multiple asterisks
-        text = re.sub(r'#{4,}', '###', text)   # Limit header levels
+        # The text is already formatted by ai_agent._format_markdown_for_web
+        # Just ensure proper spacing and structure
+        text = re.sub(r'\n{3,}', '\n\n', text)  # Normalize paragraph spacing
         
-        return text
+        # Add some visual breaks for better readability
+        text = re.sub(r'(\d+\. )', r'\n\1', text)  # Add space before numbered items
+        
+        return text.strip()
     
     def _show_error(self, message: str):
         """Show error message"""
@@ -362,6 +364,50 @@ class DivinationWebApp:
         }
         .q-field__control {
             color: white !important;
+        }
+        
+        /* Enhanced AI interpretation text styling */
+        .ai-interpretation {
+            line-height: 1.8 !important;
+            font-size: 16px !important;
+        }
+        
+        .ai-interpretation h3 {
+            color: #67e8f9 !important;
+            font-size: 1.2rem !important;
+            font-weight: 600 !important;
+            margin: 1.5rem 0 0.8rem 0 !important;
+            border-left: 3px solid #06b6d4;
+            padding-left: 12px;
+        }
+        
+        .ai-interpretation p {
+            margin-bottom: 1.2rem !important;
+            text-indent: 2em;
+            color: #e5e7eb !important;
+        }
+        
+        .ai-interpretation ul, .ai-interpretation ol {
+            margin: 1rem 0 !important;
+            padding-left: 1.5rem !important;
+        }
+        
+        .ai-interpretation li {
+            margin-bottom: 0.6rem !important;
+            color: #e5e7eb !important;
+        }
+        
+        .ai-interpretation strong {
+            color: #fbbf24 !important;
+            font-weight: 600 !important;
+        }
+        
+        .ai-interpretation blockquote {
+            border-left: 3px solid #7c3aed;
+            padding-left: 1rem;
+            margin: 1rem 0;
+            font-style: italic;
+            color: #c4b5fd !important;
         }
         """)
         

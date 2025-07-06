@@ -82,7 +82,12 @@ class DivinationAgent:
             "2. 深入分析三传符号的含义和五行关系\n"
             "3. 将占卜结果与求问事项紧密结合，提供针对性解读\n"
             "4. 避免泛泛而谈，要针对具体问题给出具体指导\n"
-            "5. 语言要优雅含蓄，富有哲理，但让现代人容易理解\n"
+            "5. 语言要优雅含蓄，富有哲理，但让现代人容易理解\n\n"
+            "格式要求：\n"
+            "- 使用清晰的段落结构，每段专注一个要点\n"
+            "- 用 ### 标题区分不同主题（如：卦象分析、时间发展、建议指导等）\n"
+            "- 重要内容使用 **粗体** 强调\n"
+            "- 具体建议可用列表形式呈现\n"
             "请始终围绕求问者的具体问题进行解读，字数控制在1000字以内。"
         )
     
@@ -175,7 +180,7 @@ class DivinationAgent:
             console.print(f"\n[bold red]{model_name}解读失败：{str(e)}[/bold red]")
             raise
         
-        return self._clean_markdown(full_response)
+        return self._format_markdown_for_web(full_response)
     
     async def _stream_interpretation_web(self, prompt: str, deps: DivinationDeps) -> str:
         """异步流式处理AI解读 - Web版本（无控制台输出）"""
@@ -193,16 +198,37 @@ class DivinationAgent:
         except Exception:
             raise
         
-        return self._clean_markdown(full_response)
+        return self._format_markdown_for_web(full_response)
     
     def _clean_markdown(self, text: str) -> str:
-        """清理Markdown格式"""
-        # 移除Markdown格式
+        """清理Markdown格式 - CLI版本"""
+        # 移除Markdown格式用于CLI显示
         text = re.sub(r'#+ ', '', text)  # 移除标题
         text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # 移除粗体
         text = re.sub(r'\*(.*?)\*', r'\1', text)  # 移除斜体
         text = re.sub(r'- ', '', text)  # 移除列表符号
         return text
+    
+    def _format_markdown_for_web(self, text: str) -> str:
+        """为Web界面格式化Markdown - 保留结构"""
+        if not text:
+            return ""
+        
+        # 清理过度的markdown格式但保留结构
+        text = re.sub(r'#{4,}', '###', text)  # 限制标题级别最多到h3
+        text = re.sub(r'\*\*\*+', '**', text)  # 减少多重星号
+        
+        # 确保段落分隔
+        text = re.sub(r'\n{3,}', '\n\n', text)  # 标准化段落间距
+        
+        # 优化列表格式
+        text = re.sub(r'^(\d+\.)\s*', r'\1 ', text, flags=re.MULTILINE)  # 标准化有序列表
+        text = re.sub(r'^[-*]\s*', r'- ', text, flags=re.MULTILINE)  # 标准化无序列表
+        
+        # 确保每个主要部分前有适当间距
+        text = re.sub(r'(###[^\n]+)', r'\n\1', text)
+        
+        return text.strip()
     
     def _generate_interpretation_prompt(self, symbols, question: str) -> str:
         """生成解读提示词"""
