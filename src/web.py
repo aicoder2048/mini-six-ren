@@ -55,10 +55,10 @@ class DivinationWebApp:
         """Validate number inputs"""
         try:
             nums = [int(n) for n in [num1_str, num2_str, num3_str]]
-            if all(1 <= n <= 9 for n in nums):
+            if all(1 <= n <= 999 for n in nums):
                 return True, "", nums
             else:
-                return False, "数字必须在1-9之间", []
+                return False, "数字必须在1-999之间", []
         except ValueError:
             return False, "请输入有效数字", []
     
@@ -150,11 +150,12 @@ class DivinationWebApp:
                 self._show_error(error_msg)
                 return
             
-            # Show loading
+            # Show loading with modern design
             self.result_area.clear()
             with self.result_area:
-                spinner = ui.spinner('dots', size='lg', color='primary')
-                loading_label = ui.label('正在计算占卜结果...')
+                with ui.card().classes('w-full bento-card rounded-2xl p-12 text-center'):
+                    ui.spinner('dots', size='lg').props('color=purple')
+                    ui.label('正在连接天地智慧...').classes('text-xl text-gray-300 mt-4')
             
             # Force UI update to show spinner
             await asyncio.sleep(0.1)
@@ -185,83 +186,97 @@ class DivinationWebApp:
         self.result_area.clear()
         
         with self.result_area:
-            # Display divination table
-            ui.separator().classes('my-4')
-            ui.label('占卜结果').classes('text-h5 text-center text-primary')
-            ui.separator().classes('my-4')
+            # Modern results header
+            with ui.card().classes('w-full gradient-purple rounded-3xl shadow-2xl mb-6'):
+                with ui.card_section().classes('p-8 text-center'):
+                    ui.label('占卜结果').classes('text-4xl font-bold text-white mb-2')
+                    ui.label('DIVINATION RESULTS').classes('text-sm tracking-widest text-white opacity-80')
             
-            with ui.card().classes('w-full shadow-lg'):
-                with ui.card_section():
-                    ui.label('小六壬三传占卜').classes('text-h6 text-center mb-4')
+            # Three transmissions display with modern cards
+            with ui.grid(columns=5).classes('w-full gap-4 mb-6'):
+                # First transmission
+                with ui.card().classes('col-span-1 bento-card rounded-2xl p-6'):
+                    ui.label('初传').classes('text-sm text-gray-400 mb-2')
+                    ui.label(symbols[0].name).classes('text-3xl font-bold gradient-text mb-2')
+                    ui.label(f'{symbols[0].element.name}行').classes('text-sm text-gray-300')
+                    ui.label(symbols[0].direction).classes('text-xs text-gray-400')
+                        
+                # First relation arrow
+                with ui.column().classes('col-span-1 justify-center items-center'):
+                    relation_class = 'gradient-cyan' if relations[0] == '生' else 'gradient-amber' if relations[0] == '克' else 'bg-gray-600'
+                    with ui.element('div').classes(f'{relation_class} rounded-full p-3'):
+                        ui.icon('arrow_forward', size='1.5rem').classes('text-white')
+                    ui.label(relations[0]).classes('text-sm text-gray-400 mt-2')
+                
+                # Second transmission
+                with ui.card().classes('col-span-1 bento-card rounded-2xl p-6'):
+                    ui.label('中传').classes('text-sm text-gray-400 mb-2')
+                    ui.label(symbols[1].name).classes('text-3xl font-bold gradient-text mb-2')
+                    ui.label(f'{symbols[1].element.name}行').classes('text-sm text-gray-300')
+                    ui.label(symbols[1].direction).classes('text-xs text-gray-400')
+                
+                # Second relation arrow
+                with ui.column().classes('col-span-1 justify-center items-center'):
+                    relation_class = 'gradient-cyan' if relations[1] == '生' else 'gradient-amber' if relations[1] == '克' else 'bg-gray-600'
+                    with ui.element('div').classes(f'{relation_class} rounded-full p-3'):
+                        ui.icon('arrow_forward', size='1.5rem').classes('text-white')
+                    ui.label(relations[1]).classes('text-sm text-gray-400 mt-2')
+                
+                # Third transmission
+                with ui.card().classes('col-span-1 bento-card rounded-2xl p-6'):
+                    ui.label('末传').classes('text-sm text-gray-400 mb-2')
+                    ui.label(symbols[2].name).classes('text-3xl font-bold gradient-text mb-2')
+                    ui.label(f'{symbols[2].element.name}行').classes('text-sm text-gray-300')
+                    ui.label(symbols[2].direction).classes('text-xs text-gray-400')
                     
-                    # Create divination results grid
-                    with ui.grid(columns=5).classes('w-full gap-4'):
-                        # Headers
-                        ui.label('初传（前期）').classes('text-center font-bold text-primary col-span-1')
-                        ui.label('关系').classes('text-center font-bold text-secondary col-span-1')
-                        ui.label('中传（中期）').classes('text-center font-bold text-primary col-span-1')
-                        ui.label('关系').classes('text-center font-bold text-secondary col-span-1')
-                        ui.label('末传（后期）').classes('text-center font-bold text-primary col-span-1')
-                        
-                        # Display actual symbols
-                        with ui.card().classes('p-4 text-center bg-blue-50'):
-                            ui.label(f'【{symbols[0].name}】').classes('text-lg font-bold text-blue-700')
-                            ui.label(f'({symbols[0].element.name})').classes('text-sm text-gray-600')
-                            ui.label(f'{symbols[0].direction}').classes('text-xs text-gray-500')
-                        
-                        # First relation
-                        relation_color = 'text-green-500' if relations[0] == '生' else 'text-red-500' if relations[0] == '克' else 'text-gray-500'
-                        ui.label(f'{relations[0]}→').classes(f'text-center text-2xl {relation_color}')
-                        
-                        with ui.card().classes('p-4 text-center bg-green-50'):
-                            ui.label(f'【{symbols[1].name}】').classes('text-lg font-bold text-green-700')
-                            ui.label(f'({symbols[1].element.name})').classes('text-sm text-gray-600')
-                            ui.label(f'{symbols[1].direction}').classes('text-xs text-gray-500')
-                        
-                        # Second relation
-                        relation_color = 'text-green-500' if relations[1] == '生' else 'text-red-500' if relations[1] == '克' else 'text-gray-500'
-                        ui.label(f'{relations[1]}→').classes(f'text-center text-2xl {relation_color}')
-                        
-                        with ui.card().classes('p-4 text-center bg-purple-50'):
-                            ui.label(f'【{symbols[2].name}】').classes('text-lg font-bold text-purple-700')
-                            ui.label(f'({symbols[2].element.name})').classes('text-sm text-gray-600')
-                            ui.label(f'{symbols[2].direction}').classes('text-xs text-gray-500')
+            # Detailed symbol information in Bento Grid
+            with ui.grid(columns='1 1 1').classes('w-full gap-4 mb-6'):
+                for i, symbol in enumerate(symbols):
+                    position = ["初传", "中传", "末传"][i]
+                    gradient = ['gradient-purple', 'gradient-cyan', 'gradient-amber'][i]
                     
-                    # Additional symbol information
-                    ui.separator().classes('my-4')
-                    ui.label('符号详解').classes('text-subtitle1 font-bold mb-2')
-                    
-                    with ui.row().classes('w-full gap-4'):
-                        for i, symbol in enumerate(symbols):
-                            position = ["初传", "中传", "末传"][i]
-                            with ui.card().classes('flex-1'):
-                                with ui.card_section():
-                                    ui.label(f'{position} - {symbol.name}').classes('font-bold text-center')
-                                    ui.label(symbol.description).classes('text-sm text-center')
-                                    ui.separator().classes('my-2')
-                                    ui.label(f'神灵：{symbol.deity}').classes('text-xs')
-                                    ui.label(symbol.deity_description).classes('text-xs text-gray-600')
+                    with ui.card().classes(f'col-span-1 bento-card rounded-2xl overflow-hidden'):
+                        # Gradient header
+                        with ui.element('div').classes(f'{gradient} p-4'):
+                            ui.label(f'{position} · {symbol.name}').classes('text-xl font-bold text-white')
+                        
+                        # Content
+                        with ui.card_section().classes('p-6'):
+                            ui.label(symbol.description).classes('text-gray-300 mb-4')
+                            
+                            with ui.column().classes('gap-3'):
+                                with ui.row().classes('items-center gap-2'):
+                                    ui.icon('temple_buddhist', size='1.2rem').classes('text-purple-400')
+                                    ui.label(f'神灵: {symbol.deity}').classes('text-sm text-gray-300')
+                                
+                                ui.label(symbol.deity_description).classes('text-xs text-gray-400 ml-7')
+                                
+                                with ui.row().classes('items-center gap-2'):
+                                    ui.icon('explore', size='1.2rem').classes('text-cyan-400')
+                                    ui.label(f'方位: {symbol.direction}').classes('text-sm text-gray-300')
         
         # Display AI interpretation with streaming
         self._display_ai_result(ai_result)
     
     def _display_ai_result(self, ai_result):
-        """Display AI interpretation with streaming effect"""
+        """Display AI interpretation with modern design"""
         if not ai_result:
             return
             
         self.ai_result_area.clear()
         with self.ai_result_area:
-            ui.separator().classes('my-4')
-            ui.label('AI解读').classes('text-h5 text-center text-secondary')
-            ui.separator().classes('my-4')
-            
-            with ui.card().classes('w-full shadow-lg'):
-                with ui.card_section():
-                    # Display AI result with proper formatting
-                    # Clean up the text and display it nicely
+            # AI interpretation with gradient accent
+            with ui.card().classes('w-full bento-card rounded-2xl overflow-hidden'):
+                # Gradient header
+                with ui.element('div').classes('gradient-cyan p-6'):
+                    with ui.row().classes('items-center gap-3'):
+                        ui.icon('psychology', size='2rem').classes('text-white')
+                        ui.label('AI 智慧解读').classes('text-2xl font-bold text-white')
+                
+                # Content
+                with ui.card_section().classes('p-8'):
                     cleaned_result = self._clean_ai_result(ai_result)
-                    ui.markdown(cleaned_result).classes('prose max-w-none')
+                    ui.markdown(cleaned_result).classes('prose prose-invert max-w-none text-gray-300')
     
     def _clean_ai_result(self, text: str) -> str:
         """Clean and format AI result text"""
@@ -290,108 +305,211 @@ class DivinationWebApp:
     
     def create_ui(self):
         """Create the main UI"""
-        # Set up page styling
-        ui.colors(primary='#1976d2', secondary='#26a69a', accent='#9c27b0', 
-                 dark='#1d1d1d', positive='#21ba45', negative='#c10015', 
-                 info='#31ccec', warning='#f2c037')
+        # Set up modern gradient color scheme
+        ui.colors(primary='#7c3aed', secondary='#06b6d4', accent='#f59e0b', 
+                 dark='#1e1b4b', positive='#10b981', negative='#ef4444', 
+                 info='#3b82f6', warning='#f59e0b')
+        
+        # Add custom CSS for gradients and modern styling
+        ui.add_css("""
+        /* Full page dark background */
+        body {
+            background-color: #111827 !important;
+            color: white !important;
+            margin: 0;
+            padding: 0;
+        }
+        .q-page {
+            background-color: #111827 !important;
+        }
+        .gradient-purple {
+            background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+        }
+        .gradient-cyan {
+            background: linear-gradient(135deg, #06b6d4 0%, #67e8f9 100%);
+        }
+        .gradient-amber {
+            background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .bento-card {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        .bento-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .huge-text {
+            font-size: 4rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+        .medium-text {
+            font-size: 2rem;
+            font-weight: 600;
+        }
+        /* Fix input text colors */
+        .q-field__native {
+            color: white !important;
+        }
+        .q-field__control {
+            color: white !important;
+        }
+        """)
         
         # Main container
-        with ui.column().classes('w-full max-w-4xl mx-auto p-4'):
-            # Header
-            with ui.row().classes('w-full justify-center mb-6'):
-                ui.label('小六壬占卜 Web版').classes('text-h3 text-center text-primary')
-                ui.label('Mini Six Ren Divination').classes('text-h6 text-center text-gray-600')
+        with ui.column().classes('w-full min-h-screen bg-gray-900'):
+            with ui.column().classes('w-full max-w-6xl mx-auto p-6'):
+                # Hero Header with gradient
+                with ui.card().classes('w-full gradient-purple text-white rounded-3xl shadow-2xl mb-8'):
+                    with ui.card_section().classes('p-12 text-center'):
+                        ui.label('小六壬').classes('huge-text mb-2')
+                        ui.label('MINI SIX REN DIVINATION').classes('text-sm tracking-widest opacity-80 mb-4')
+                        ui.label('古老智慧 · 现代演绎').classes('text-xl font-light')
             
-            # Usage instructions
-            with ui.expansion('使用说明', icon='help').classes('w-full mb-4'):
-                ui.markdown("""
-                ### 使用方法
+                # Compact usage guide with stats
+                with ui.card().classes('w-full bento-card rounded-2xl p-6 mb-6'):
+                    with ui.row().classes('w-full items-center gap-8'):
+                        # Instructions on the left
+                        with ui.column().classes('flex-1'):
+                            with ui.row().classes('items-center gap-3 mb-3'):
+                                ui.icon('auto_stories', size='2rem').classes('text-purple-300')
+                                ui.label('使用指南').classes('text-xl font-semibold text-white')
+                            
+                            with ui.row().classes('gap-6'):
+                                with ui.row().classes('items-center gap-2'):
+                                    ui.label('1').classes('text-xl font-bold text-purple-300')
+                                    ui.label('选择AI模型').classes('text-sm text-gray-300')
+                                
+                                with ui.row().classes('items-center gap-2'):
+                                    ui.label('2').classes('text-xl font-bold text-cyan-300')
+                                    ui.label('输入占卜数据').classes('text-sm text-gray-300')
+                                
+                                with ui.row().classes('items-center gap-2'):
+                                    ui.label('3').classes('text-xl font-bold text-amber-300')
+                                    ui.label('描述您的问题').classes('text-sm text-gray-300')
+                    
+                        # Stats on the right
+                        with ui.row().classes('gap-4'):
+                            with ui.card().classes('bento-card rounded-xl p-4 gradient-cyan'):
+                                ui.label('9').classes('text-3xl font-bold text-white')
+                                ui.label('宫位').classes('text-xs text-white opacity-80')
+                            
+                            with ui.card().classes('bento-card rounded-xl p-4 gradient-amber'):
+                                ui.label('3').classes('text-3xl font-bold text-white')
+                                ui.label('三传').classes('text-xs text-white opacity-80')
+                            
+                            with ui.card().classes('bento-card rounded-xl p-4 gradient-purple'):
+                                ui.label('∞').classes('text-3xl font-bold text-white')
+                                ui.label('智慧').classes('text-xs text-white opacity-80')
+            
+                # Model selection in a beautiful card
+                with ui.card().classes('w-full bento-card rounded-2xl p-6 mb-6'):
+                    ui.label('AI模型选择').classes('text-xl font-semibold text-white mb-4')
+                    if self.available_models:
+                        model_options = [SupportedModels.get_display_name(model) 
+                                       for model in self.available_models]
+                        self.model_select = ui.select(
+                            model_options, 
+                            label='',
+                            value=model_options[0] if model_options else None,
+                            on_change=self._on_model_change
+                        ).classes('w-full').props('dark filled')
+                    else:
+                        with ui.card().classes('w-full bg-red-500/20 border-red-500/50 rounded-xl p-4'):
+                            ui.label('⚠️ 未找到可用的AI模型，请检查API密钥配置').classes('text-red-300')
+                        return
+            
+                # Input section with modern tabs
+                with ui.card().classes('w-full bento-card rounded-2xl p-6 mb-6'):
+                    ui.label('占卜输入').classes('text-xl font-semibold text-white mb-4')
+                    
+                    with ui.tabs().classes('w-full') as tabs:
+                        numbers_tab = ui.tab('numbers', label='数字模式', icon='pin')
+                        date_tab = ui.tab('date', label='时间模式', icon='calendar_today') 
+                        chinese_tab = ui.tab('chinese', label='汉字模式', icon='translate')
+                    
+                    with ui.tab_panels(tabs, value='numbers').classes('w-full mt-4'):
+                        # Numbers input panel
+                        with ui.tab_panel('numbers'):
+                            ui.label('请输入三个数字（1-999）').classes('text-gray-300 mb-4')
+                            with ui.row().classes('w-full gap-4'):
+                                self.number_inputs = []
+                                for i, label in enumerate(['初数', '中数', '末数']):
+                                    with ui.column().classes('flex-1'):
+                                        ui.label(label).classes('text-sm text-gray-400 mb-1')
+                                        num_input = ui.number(
+                                            label='', 
+                                            value=i+1, 
+                                            min=1, 
+                                            max=999
+                                        ).classes('w-full text-white').props('dark filled outlined input-class="text-white"')
+                                        self.number_inputs.append(num_input)
                 
-                1. **选择AI模型**：从下拉菜单中选择可用的AI模型
-                2. **选择输入方式**：
-                   - **数字输入**：直接输入3个数字（1-9）
-                   - **日期输入**：选择日期和时间，系统自动转换为数字
-                   - **汉字输入**：输入汉字，系统计算笔画数
-                3. **填写问题**：描述您要占卜的具体问题
-                4. **开始占卜**：点击按钮查看结果和AI解读
+                        # Date input panel
+                        with ui.tab_panel('date'):
+                            ui.label('请选择日期和时间').classes('text-gray-300 mb-4')
+                            with ui.row().classes('w-full gap-4'):
+                                with ui.column().classes('flex-1'):
+                                    ui.label('日期').classes('text-sm text-gray-400 mb-1')
+                                    self.date_input = ui.date(
+                                        value=datetime.now().strftime('%Y-%m-%d')
+                                    ).classes('w-full').props('dark filled')
+                                with ui.column().classes('flex-1'):
+                                    ui.label('时间').classes('text-sm text-gray-400 mb-1')
+                                    self.time_input = ui.time(
+                                        value=datetime.now().strftime('%H:%M')
+                                    ).classes('w-full').props('dark filled')
                 
-                ### 关于小六壬
-                小六壬是中国传统占卜方法，通过三传（初传、中传、末传）来预测事物的发展趋势。
-                """).classes('prose max-w-none')
+                        # Chinese characters input panel
+                        with ui.tab_panel('chinese'):
+                            ui.label('请输入至少3个汉字（将计算笔画数）').classes('text-gray-300 mb-4')
+                            self.chinese_input = ui.input(
+                                label='',
+                                placeholder='例如：测试运势、工作顺利、感情和谐'
+                            ).classes('w-full').props('dark filled outlined')
             
-            # Model selection
-            if self.available_models:
-                model_options = [SupportedModels.get_display_name(model) 
-                               for model in self.available_models]
-                self.model_select = ui.select(
-                    model_options, 
-                    label='选择AI模型',
-                    value=model_options[0] if model_options else None,
-                    on_change=self._on_model_change
-                ).classes('w-full mb-4')
-            else:
-                ui.banner('未找到可用的AI模型，请检查API密钥配置', type='warning')
-                return
-            
-            # Input tabs
-            with ui.tabs().classes('w-full') as tabs:
-                numbers_tab = ui.tab('numbers', label='数字输入')
-                date_tab = ui.tab('date', label='日期输入') 
-                chinese_tab = ui.tab('chinese', label='汉字输入')
-            
-            with ui.tab_panels(tabs, value='numbers').classes('w-full'):
-                # Numbers input panel
-                with ui.tab_panel('numbers'):
-                    ui.label('请输入三个数字（1-9）').classes('text-subtitle1 mb-2')
-                    with ui.row().classes('w-full'):
-                        self.number_inputs = [
-                            ui.number(label='第一个数字', value=1, min=1, max=9).classes('flex-1'),
-                            ui.number(label='第二个数字', value=2, min=1, max=9).classes('flex-1'),
-                            ui.number(label='第三个数字', value=3, min=1, max=9).classes('flex-1')
-                        ]
+                    self.input_tabs = tabs
                 
-                # Date input panel
-                with ui.tab_panel('date'):
-                    ui.label('请选择日期和时间').classes('text-subtitle1 mb-2')
-                    with ui.row().classes('w-full'):
-                        self.date_input = ui.date(value=datetime.now().strftime('%Y-%m-%d')).classes('flex-1')
-                        self.time_input = ui.time(value=datetime.now().strftime('%H:%M')).classes('flex-1')
+                # Question input with gradient accent
+                with ui.card().classes('w-full bento-card rounded-2xl p-6 mb-6'):
+                    with ui.row().classes('items-center gap-3 mb-4'):
+                        ui.icon('psychology', size='2rem').classes('text-purple-400')
+                        ui.label('您的问题').classes('text-xl font-semibold text-white')
+                    
+                    self.question_input = ui.textarea(
+                        label='',
+                        placeholder='请详细描述您要占卜的问题...\n例如：今日运势如何？工作项目能否顺利？感情发展趋势？',
+                        validation={'请输入问题': lambda value: len(value.strip()) > 0}
+                    ).classes('w-full').props('dark filled autogrow rows=3')
+            
+                # Error message area
+                self.error_message = ui.label('').classes('text-red-400 text-center font-semibold mb-4')
                 
-                # Chinese characters input panel
-                with ui.tab_panel('chinese'):
-                    ui.label('请输入至少3个汉字（将计算笔画数）').classes('text-subtitle1 mb-2')
-                    self.chinese_input = ui.input(
-                        label='输入汉字',
-                        placeholder='例如：测试运势'
-                    ).classes('w-full')
+                # Divination button with gradient
+                def on_divination_click():
+                    asyncio.create_task(self._perform_divination())
+                
+                with ui.element('button').classes(
+                    'w-full gradient-purple text-white font-bold py-4 px-8 rounded-2xl '
+                    'text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 '
+                    'transition-all duration-200'
+                ).on('click', on_divination_click):
+                    with ui.row().classes('justify-center items-center gap-3'):
+                        ui.icon('auto_fix_high', size='1.5rem')
+                        ui.label('开始占卜')
             
-            self.input_tabs = tabs
-            
-            # Question input
-            ui.separator().classes('my-4')
-            ui.label('请描述您要占卜的问题').classes('text-subtitle1 mb-2')
-            self.question_input = ui.textarea(
-                label='占卜问题',
-                placeholder='例如：今日运势如何？工作是否顺利？'
-            ).classes('w-full')
-            
-            # Error message area
-            self.error_message = ui.label('').classes('text-red-500 text-center font-bold')
-            
-            # Divination button
-            def on_divination_click():
-                asyncio.create_task(self._perform_divination())
-            
-            ui.button(
-                '开始占卜',
-                on_click=on_divination_click,
-                color='primary'
-            ).classes('w-full mt-4 p-3 text-h6')
-            
-            # Results area
-            ui.separator().classes('my-6')
-            self.result_area = ui.column().classes('w-full')
-            self.ai_result_area = ui.column().classes('w-full')
+                # Results area
+                self.result_area = ui.column().classes('w-full mt-8')
+                self.ai_result_area = ui.column().classes('w-full')
 
 
 def main():
@@ -403,8 +521,8 @@ def main():
     # Create the application
     web_app = DivinationWebApp()
     
-    # Set up the main page
-    @ui.page('/')
+    # Set up the main page with dark theme
+    @ui.page('/', dark=True)
     def index():
         web_app.create_ui()
     
@@ -414,7 +532,8 @@ def main():
         port=8080,
         host='0.0.0.0',
         reload=True,
-        favicon='🔮'
+        favicon='🔮',
+        dark=True
     )
 
 

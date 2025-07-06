@@ -34,7 +34,12 @@ class HandTechnique:
 
     @staticmethod
     def __calculate_symbol(start_position, steps):
-        end_position = (start_position + steps - 1) % 9
+        # For numbers > 9, we use modulo 9 to map to 1-9 range
+        # If steps % 9 == 0, we use 9 instead of 0
+        normalized_steps = steps % 9
+        if normalized_steps == 0:
+            normalized_steps = 9
+        end_position = (start_position + normalized_steps - 1) % 9
         return SYMBOLS[end_position]
 
     @staticmethod
