@@ -65,12 +65,12 @@ class DivinationWebApp:
     def _validate_chinese(self, text: str) -> tuple[bool, str, List[int]]:
         """Validate Chinese character input"""
         if not text or len(text) < 3:
-            return False, "请输入至少3个汉字", []
+            return False, "请输入3个汉字", []
         
         # Check if all characters are Chinese
         chinese_chars = [c for c in text if '\u4e00' <= c <= '\u9fff']
         if len(chinese_chars) < 3:
-            return False, "请输入至少3个汉字", []
+            return False, "请输入3个汉字", []
         
         # Get stroke counts for first 3 characters
         first_three = chinese_chars[:3]
@@ -517,7 +517,7 @@ class DivinationWebApp:
                 
                         # Chinese characters input panel
                         with ui.tab_panel('chinese'):
-                            ui.label('请输入至少3个汉字（将计算笔画数）').classes('text-gray-300 mb-4')
+                            ui.label('请输入3个汉字（将计算笔画数）').classes('text-gray-300 mb-4')
                             self.chinese_input = ui.input(
                                 label='',
                                 placeholder='例如：测试运势、工作顺利、感情和谐'
