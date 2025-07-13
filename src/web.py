@@ -229,31 +229,43 @@ class DivinationWebApp:
                     ui.label(f'{symbols[2].element.name}行').classes('text-sm text-gray-300')
                     ui.label(symbols[2].direction).classes('text-xs text-gray-400')
                     
-            # Detailed symbol information in Bento Grid
-            with ui.grid(columns='1 1 1').classes('w-full gap-4 mb-6'):
+            # Detailed symbol information with compact table layout
+            with ui.element('table').classes('w-full mb-6').style('border-spacing: 0 16px; border-collapse: separate;'):
                 for i, symbol in enumerate(symbols):
                     position = ["初传", "中传", "末传"][i]
                     gradient = ['gradient-purple', 'gradient-cyan', 'gradient-amber'][i]
                     
-                    with ui.card().classes(f'col-span-1 bento-card rounded-2xl overflow-hidden'):
-                        # Gradient header
-                        with ui.element('div').classes(f'{gradient} p-4'):
-                            ui.label(f'{position} · {symbol.name}').classes('text-xl font-bold text-white')
+                    with ui.element('tr'):
+                        # Left column: Header (30% width)
+                        with ui.element('td').style('width: 30%; vertical-align: top; padding-right: 16px;'):
+                            with ui.card().classes(f'{gradient} rounded-2xl h-32 flex items-center justify-center overflow-hidden shadow-lg'):
+                                with ui.column().classes('items-center px-3'):
+                                    ui.label(position).classes('text-base font-semibold text-white/95 mb-2')
+                                    ui.label(symbol.name).classes('text-3xl font-bold text-white text-center leading-none')
                         
-                        # Content
-                        with ui.card_section().classes('p-6'):
-                            ui.label(symbol.description).classes('text-gray-300 mb-4')
-                            
-                            with ui.column().classes('gap-3'):
-                                with ui.row().classes('items-center gap-2'):
-                                    ui.icon('temple_buddhist', size='1.2rem').classes('text-purple-400')
-                                    ui.label(f'神灵: {symbol.deity}').classes('text-sm text-gray-300')
-                                
-                                ui.label(symbol.deity_description).classes('text-xs text-gray-400 ml-7')
-                                
-                                with ui.row().classes('items-center gap-2'):
-                                    ui.icon('explore', size='1.2rem').classes('text-cyan-400')
-                                    ui.label(f'方位: {symbol.direction}').classes('text-sm text-gray-300')
+                        # Right column: Content (70% width)
+                        with ui.element('td').style('width: 70%; vertical-align: top;'):
+                            with ui.card().classes('bento-card rounded-2xl h-32 shadow-lg overflow-hidden'):
+                                with ui.column().classes('p-4 h-full justify-center'):
+                                    # Description with better spacing
+                                    ui.label(symbol.description).classes('text-gray-300 text-sm mb-3 leading-relaxed font-medium')
+                                    
+                                    # Metadata with improved layout
+                                    with ui.row().classes('gap-4 items-start'):
+                                        # Left metadata column
+                                        with ui.column().classes('gap-1 flex-shrink-0 min-w-28'):
+                                            with ui.row().classes('items-center gap-2'):
+                                                ui.icon('temple_buddhist', size='1rem').classes('text-purple-400')
+                                                ui.label(f'神灵: {symbol.deity}').classes('text-xs text-gray-300 font-medium')
+                                            
+                                            with ui.row().classes('items-center gap-2'):
+                                                ui.icon('explore', size='1rem').classes('text-cyan-400')
+                                                ui.label(f'方位: {symbol.direction}').classes('text-xs text-gray-300 font-medium')
+                                        
+                                        # Right description column
+                                        with ui.column().classes('flex-1 min-w-0'):
+                                            ui.label(symbol.deity_description).classes('text-xs text-gray-400 leading-relaxed')
+                    
         
         # Display AI interpretation with streaming
         self._display_ai_result(ai_result)
@@ -267,11 +279,11 @@ class DivinationWebApp:
         with self.ai_result_area:
             # AI interpretation with gradient accent
             with ui.card().classes('w-full bento-card rounded-2xl overflow-hidden'):
-                # Gradient header
+                # Gradient header with extended width
                 with ui.element('div').classes('gradient-cyan p-6'):
                     with ui.row().classes('items-center gap-3'):
                         ui.icon('psychology', size='2rem').classes('text-white')
-                        ui.label('AI 智慧解读').classes('text-2xl font-bold text-white')
+                        ui.label('AI 智慧解读').classes('text-2xl font-bold text-white').style('min-width: 200px;')
                 
                 # Content with enhanced styling
                 with ui.card_section().classes('p-8'):
