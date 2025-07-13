@@ -520,7 +520,7 @@ class DivinationWebApp:
                             ui.label('请输入3个汉字（将计算笔画数）').classes('text-gray-300 mb-4')
                             self.chinese_input = ui.input(
                                 label='',
-                                placeholder='例如：测试运势、工作顺利、感情和谐'
+                                placeholder='例如：川建国、关税战、天行健'
                             ).classes('w-full').props('dark filled outlined')
             
                     self.input_tabs = tabs
