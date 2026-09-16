@@ -6,6 +6,7 @@ import sys
 import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import List
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -110,7 +111,7 @@ class DivinationWebApp:
                 self.status_message.set_text(f'本地三传已完成，正在等待 {model_name} 解读…')
                 with self.ai_result_area:
                     with ui.row().classes('items-center gap-3'):
-                        ui.spinner('dots').props('color=cyan')
+                        ui.spinner('dots').props('color=primary')
                         ui.label('本地三传已呈现，AI将结合您的问题解读。')
                 await asyncio.sleep(0)
                 interpretation = await DivinationAgent(model).interpret_prediction_async(result.symbols, question)
@@ -135,31 +136,35 @@ class DivinationWebApp:
                   ('中传｜过程', '推进中的变化与牵制'),
                   ('末传｜趋势', '条件延续时的可能走向')]
         with self.result_area:
-            ui.label('三传结果').classes('text-2xl font-bold')
-            ui.label(self.input_summary).classes('text-sm text-slate-300 break-words w-full')
-            if self.question_snapshot:
-                ui.label(f'本次问题：{self.question_snapshot}').classes('text-sm text-slate-300 break-words w-full')
-            ui.label('项目九宫法 · 三传表示观察阶段，不对应确定期限。').classes('text-sm text-slate-400')
+            with ui.row().classes('section-heading'):
+                ui.label('三传已成').classes('serif result-title')
+                ui.badge('本地计算完成', color=None).classes('mode-badge')
+            with ui.column().classes('input-snapshot'):
+                ui.label(self.input_summary)
+                if self.question_snapshot:
+                    ui.label(f'本次问题：{self.question_snapshot}')
+            ui.label('项目九宫法 · 三传表示观察阶段，不对应确定期限。').classes('helper-text')
             with ui.element('div').classes('transmission-grid'):
                 for i, (symbol, (stage, hint)) in enumerate(zip(symbols, stages)):
-                    with ui.card().classes('surface transmission-card'):
-                        ui.label(stage).classes('text-cyan-200 font-semibold')
-                        ui.label(hint).classes('text-xs text-slate-300')
-                        with ui.row().classes('items-center gap-3'):
-                            ui.label(symbol.name).classes('text-3xl font-bold text-white')
-                            ui.badge(f'五行 · {symbol.element.name}').props('outline color=cyan')
-                        ui.label(symbol.description).classes('font-medium text-slate-200')
-                        ui.label(symbol.interpretation).classes('leading-relaxed text-slate-300')
+                    with ui.card().classes('transmission-card'):
+                        with ui.row().classes('section-heading'):
+                            ui.label(stage).classes('stage-label')
+                            ui.label(f'0{i + 1}').classes('stage-number')
+                        ui.label(hint).classes('helper-text')
+                        ui.label(symbol.name).classes('serif symbol-name')
+                        ui.badge(f'五行 · {symbol.element.name}', color=None).classes('element-badge')
+                        ui.label(symbol.description).classes('symbol-description')
+                        ui.label(symbol.interpretation).classes('symbol-interpretation')
                         if i < 2:
                             with ui.column().classes('relation-block'):
-                                ui.label(f'{("初传→中传", "中传→末传")[i]} · {relations[i]}').classes('text-amber-200 font-medium')
-                                ui.label(describe_relation(symbol, symbols[i + 1], relations[i])).classes('text-sm text-slate-200')
-            ui.label('生：生助；克：制约；比和：同类。被生、被克以箭头左侧的传为主语，不能只凭生克判定吉凶。').classes('text-sm text-slate-300')
-            with ui.expansion('查看传统文化背景', icon='auto_stories').classes('w-full surface'):
+                                ui.label(f'{("初传→中传", "中传→末传")[i]} · {relations[i]}').classes('relation-title')
+                                ui.label(describe_relation(symbol, symbols[i + 1], relations[i])).classes('helper-text')
+            ui.label('生：生助；克：制约；比和：同类。被生、被克以箭头左侧的传为主语，不能只凭生克判定吉凶。').classes('helper-text')
+            with ui.expansion('查看传统文化背景', icon='auto_stories').classes('culture-panel'):
                 for symbol, (stage, _) in zip(symbols, stages):
-                    ui.label(f'{stage} · {symbol.name} · 方位：{symbol.direction} · 神灵：{symbol.deity}').classes('font-medium')
-                    ui.label(symbol.deity_description).classes('text-sm text-slate-300 mb-3')
-                ui.label('方位与神灵是传统文化象征，不代表现实效果。').classes('text-sm text-slate-400')
+                    ui.label(f'{stage} · {symbol.name} · 方位：{symbol.direction} · 神灵：{symbol.deity}').classes('culture-title')
+                    ui.label(symbol.deity_description).classes('helper-text mb-3')
+                ui.label('方位与神灵是传统文化象征，不代表现实效果。').classes('helper-text')
         self._display_ai_result(ai_result)
 
     def _display_ai_result(self, ai_result):
@@ -167,9 +172,32 @@ class DivinationWebApp:
             return
         self.ai_result_area.clear()
         with self.ai_result_area:
-            with ui.card().classes('w-full surface p-5 md:p-8'):
-                ui.label('AI 三传解读').classes('text-xl font-bold text-cyan-200')
+            with ui.card().classes('ai-card'):
+                with ui.row().classes('items-center gap-2'):
+                    ui.icon('auto_awesome').classes('accent-text')
+                    ui.label('AI 三传解读').classes('serif text-xl')
                 ui.markdown(ai_result).classes('ai-interpretation w-full')
+
+    def _display_empty_state(self):
+        with self.result_area:
+            with ui.column().classes('empty-state'):
+                ui.html('''<div class="compass" aria-hidden="true">
+                    <span class="compass-top">起</span><span class="compass-right">承</span>
+                    <span class="compass-bottom">转</span><span class="compass-left">合</span>
+                    <div class="compass-inner"><span>壬</span></div>
+                </div>''')
+                ui.label('静心一刻，三传待启').classes('serif empty-title')
+                ui.label('从左侧选一种方式起课，看看事情的起点、过程与趋势。').classes('empty-copy desktop-copy')
+                ui.label('在上方选一种方式起课，看看事情的起点、过程与趋势。').classes('empty-copy mobile-copy')
+                with ui.element('div').classes('stage-guide'):
+                    for number, title, hint in [('一', '初传', '看见起点'), ('二', '中传', '理解过程'), ('三', '末传', '观察趋势')]:
+                        with ui.column().classes('stage-guide-item'):
+                            ui.label(number).classes('guide-number serif')
+                            ui.label(title).classes('guide-title')
+                            ui.label(hint).classes('helper-text')
+                with ui.row().classes('empty-note'):
+                    ui.icon('spa', size='16px')
+                    ui.label('一事一问，让思绪有迹可循')
 
     def _show_error(self, message: str):
         self.error_message.set_text(message)
@@ -180,79 +208,107 @@ class DivinationWebApp:
 
     def create_ui(self):
         now = datetime.now(timezone(timedelta(hours=8)))
-        ui.colors(primary='#a78bfa', secondary='#67e8f9', negative='#fca5a5')
-        ui.add_css('''
-            body, .q-page { background: #101827; color: #f1f5f9; }
-            .page-shell { width: 100%; max-width: 1120px; margin: auto; padding: 24px; gap: 24px; }
-            .surface { background: #1c2739; border: 1px solid #3b4961; border-radius: 16px; }
-            .transmission-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; width: 100%; }
-            .transmission-card { padding: 24px; min-width: 0; overflow-wrap: anywhere; }
-            .relation-block { margin-top: auto; padding-top: 16px; border-top: 1px solid #475569; width: 100%; }
-            .input-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; }
-            .date-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; width: 100%; }
-            .q-tab-panels { background: transparent; }
-            .q-tab-panel { padding: 16px 0 0; }
-            .q-field { min-width: 0; }
-            .ai-interpretation { line-height: 1.85; font-size: 16px; overflow-wrap: anywhere; }
-            .ai-interpretation h3 { color: #a5f3fc; font-size: 1.15rem; margin: 24px 0 12px; }
-            .ai-interpretation strong { color: #fde68a; }
-            .ai-interpretation p { margin-bottom: 16px; }
-            .ai-interpretation ul, .ai-interpretation ol { padding-left: 24px; }
-            .q-btn:focus-visible, .q-item:focus-visible { outline: 2px solid #67e8f9; outline-offset: 3px; }
-            @media (max-width: 700px) {
-                .page-shell { padding: 16px; gap: 16px; }
-                .transmission-grid, .date-grid { grid-template-columns: minmax(0, 1fr); }
-                .transmission-card { padding: 20px; }
-            }
-        ''')
-        with ui.column().classes('page-shell'):
-            with ui.row().classes('w-full items-center justify-between gap-4'):
-                with ui.column().classes('gap-2'):
-                    ui.label('小六壬 · 三传').classes('text-3xl font-bold')
-                    ui.label('看清起点、过程与趋势，让传统术语更容易理解。').classes('text-slate-300')
-                ui.badge('项目九宫法').props('outline color=cyan')
+        ui.colors(primary='#a34432', secondary='#69755e', negative='#b33c32')
+        ui.add_css(Path(__file__).with_name('web.css'))
+        with ui.dialog() as guide, ui.card().classes('guide-dialog'):
+            ui.label('从一问，到三传').classes('serif text-2xl')
+            for title, copy in [
+                ('01 · 选择起课方式', '输入三个 1–999 的整数、一个北京时间，或三个汉字。三种方式任选其一。'),
+                ('02 · 留下心中所问', '问题可留空。本地模式直接呈现三传；选择可用的 AI 模型并填写问题后，才会生成解读。'),
+                ('03 · 顺着三传阅读', '初传看起点，中传看过程，末传看趋势。结合两段五行关系阅读，文化背景可按需展开。'),
+            ]:
+                ui.label(title).classes('font-semibold mt-3')
+                ui.label(copy).classes('helper-text')
+            ui.label('本工具采用项目九宫法。解读用于梳理思路，现实决定仍需事实依据。').classes('guide-footnote')
+            ui.button('开始探索', on_click=guide.close).props('unelevated no-caps').classes('self-end')
 
-            with ui.card().classes('w-full surface p-5 md:p-6'):
-                ui.label('1 · 选择起课方式').classes('text-lg font-semibold')
-                ui.label('三种方式任选一种；无需AI也能查看完整三传。').classes('text-sm text-slate-300')
-                with ui.tabs().classes('w-full').props('align=left') as tabs:
-                    ui.tab('numbers', label='数字', icon='pin')
-                    ui.tab('date', label='时间', icon='calendar_today')
-                    ui.tab('chinese', label='汉字', icon='translate')
-                with ui.tab_panels(tabs, value='numbers').classes('w-full'):
-                    with ui.tab_panel('numbers'):
-                        ui.label('输入三个1–999的整数').classes('text-sm text-slate-300 mb-3')
-                        with ui.element('div').classes('input-grid'):
-                            self.number_inputs = [
-                                ui.number(label=label, value=i + 1, min=1, max=999, step=1).classes('w-full').props('dark outlined')
-                                for i, label in enumerate(('初数', '中数', '末数'))
-                            ]
-                    with ui.tab_panel('date'):
-                        with ui.element('div').classes('date-grid'):
-                            self.date_input = ui.input('公历日期', value=now.strftime('%Y-%m-%d')).classes('w-full').props('type=date dark outlined min=1900-01-01 max=2099-12-31')
-                            self.time_input = ui.input('北京时间', value=now.strftime('%H:%M')).classes('w-full').props('type=time dark outlined')
-                        ui.label('按北京时间 UTC+8，取农历月、日、时辰；闰月沿用同名月份，23点按当日农历日取数。').classes('text-sm text-slate-300 mt-3')
-                    with ui.tab_panel('chinese'):
-                        self.chinese_input = ui.input('三个汉字', placeholder='例如：天行健、中国人').classes('w-full').props('dark outlined')
-                        ui.label('按内置字典笔画取数，支持逗号或空格分隔。').classes('text-sm text-slate-300 mt-3')
-                self.input_tabs = tabs
+        with ui.column().classes('app-shell'):
+            with ui.element('header').classes('site-header'):
+                with ui.row().classes('brand'):
+                    ui.label('壬').classes('brand-seal serif').props('aria-hidden=true')
+                    with ui.column().classes('brand-wordmark'):
+                        ui.label('小六壬').classes('serif brand-name')
+                        ui.label('MINI SIX REN').classes('brand-english')
+                with ui.row().classes('header-actions'):
+                    ui.label('传统智慧 · 当下启发').classes('header-tagline')
+                    ui.button('使用指南', icon='help_outline', on_click=guide.open).props('flat no-caps').classes('guide-button')
 
-            with ui.card().classes('w-full surface p-5 md:p-6'):
-                ui.label('2 · 解读方式（可选）').classes('text-lg font-semibold')
-                model_options = {'local': '仅本地计算（不使用AI）'}
-                model_options.update({model.value: SupportedModels.get_display_name(model) for model in self.available_models})
-                self.model_select = ui.select(model_options, label='解读方式', value=self.current_model.value if self.current_model else 'local', on_change=self._on_model_change).classes('w-full').props('dark outlined')
-                self.question_input = ui.textarea('想了解的具体问题', placeholder='例如：准备换工作，接下来应先做好哪些准备？').classes('w-full').props('dark outlined autogrow rows=2')
-                ui.label('选择AI且填写问题时才请求解读；问题留空或选择本地模式均只计算三传。').classes('text-sm text-slate-300')
-                if not self.available_models:
-                    ui.label('当前为本地模式，无需API密钥。').classes('text-sm text-cyan-200')
+            with ui.element('main').classes('page-main'):
+                with ui.element('section').classes('hero'):
+                    with ui.column().classes('hero-copy'):
+                        ui.label('观 时 · 察 势 · 明 心').classes('eyebrow')
+                        ui.label('一念起，观三传。').classes('serif hero-title').props('role=heading aria-level=1')
+                        ui.label('以传统智慧为镜，理清当下，从容向前。').classes('hero-description')
+                    with ui.column().classes('hero-aside'):
+                        ui.label('小六壬 · 项目九宫法').classes('hero-aside-title')
+                        ui.label('起点 / 过程 / 趋势').classes('hero-aside-copy')
 
-            self.error_message = ui.label('').classes('text-red-300 w-full break-words').props('role=alert')
-            self.submit_button = ui.button('查看三传', icon='auto_awesome', on_click=self._perform_divination).classes('w-full py-3 text-lg').props('no-caps')
-            self.status_message = ui.label('准备就绪：填写输入后查看三传。').classes('text-sm text-slate-300').props('role=status aria-live=polite')
-            self.result_area = ui.column().classes('w-full gap-4')
-            self.ai_result_area = ui.column().classes('w-full')
-            ui.label('传统文化探索 · 解读用于梳理思路，现实决定仍需事实依据。').classes('text-xs text-slate-400')
+                with ui.element('div').classes('workspace'):
+                    with ui.card().classes('form-card'):
+                        with ui.row().classes('section-heading'):
+                            ui.label('起一课').classes('serif panel-title')
+                            ui.badge('三种方式 · 任选其一', color=None).classes('quiet-badge')
+                        ui.label('选一个方式，从此刻开始。').classes('helper-text')
+                        with ui.tabs().classes('input-tabs').props('dense no-caps align=justify') as tabs:
+                            ui.tab('numbers', label='数字', icon='pin')
+                            ui.tab('date', label='时间', icon='schedule')
+                            ui.tab('chinese', label='汉字', icon='translate')
+                        with ui.tab_panels(tabs, value='numbers').classes('input-panels'):
+                            with ui.tab_panel('numbers'):
+                                ui.label('心中默想，输入三个 1–999 的整数。').classes('helper-text input-hint')
+                                with ui.element('div').classes('input-grid'):
+                                    self.number_inputs = [
+                                        ui.number(label=label, value=i + 1, min=1, max=999, step=1).classes('w-full').props('outlined hide-bottom-space')
+                                        for i, label in enumerate(('初数', '中数', '末数'))
+                                    ]
+                            with ui.tab_panel('date'):
+                                ui.label('以所选时刻的农历月、日、时辰起课。').classes('helper-text input-hint')
+                                with ui.element('div').classes('date-grid'):
+                                    self.date_input = ui.input('公历日期', value=now.strftime('%Y-%m-%d')).classes('w-full').props('type=date outlined hide-bottom-space min=1900-01-01 max=2099-12-31')
+                                    self.time_input = ui.input('北京时间', value=now.strftime('%H:%M')).classes('w-full').props('type=time outlined hide-bottom-space')
+                                ui.label('按北京时间 UTC+8；闰月沿用同名月份，23点按当日农历日取数。').classes('helper-text mt-3')
+                            with ui.tab_panel('chinese'):
+                                ui.label('让心中想到的三个字，成为起点。').classes('helper-text input-hint')
+                                self.chinese_input = ui.input('三个汉字', placeholder='例如：天行健、中国人').classes('w-full').props('outlined hide-bottom-space')
+                                ui.label('按内置字典笔画取数，支持逗号或空格分隔。').classes('helper-text mt-3')
+                        self.input_tabs = tabs
+                        ui.separator().classes('form-divider')
+                        with ui.row().classes('section-heading'):
+                            ui.label('心中所问').classes('form-section-title')
+                            ui.label('选填').classes('optional-label')
+                        self.question_input = ui.textarea('想了解的具体问题', placeholder='例如：准备换工作，接下来应先做好哪些准备？').classes('question-field w-full').props('outlined autogrow rows=3 hide-bottom-space')
+                        model_options = {'local': '仅本地计算（不使用AI）'}
+                        model_options.update({model.value: SupportedModels.get_display_name(model) for model in self.available_models})
+                        self.model_select = ui.select(model_options, label='解读方式', value=self.current_model.value if self.current_model else 'local', on_change=self._on_model_change).classes('w-full').props('outlined hide-bottom-space')
+                        if not self.available_models:
+                            with ui.row().classes('local-note'):
+                                ui.icon('check_circle_outline', size='16px')
+                                ui.label('本地即可查看完整三传，无需 AI。')
+                        else:
+                            ui.label('选择 AI 并填写问题后生成解读；问题留空则只计算三传。').classes('helper-text')
+                        self.error_message = ui.label('').classes('error-message').props('role=alert')
+                        self.submit_button = ui.button('查看三传', icon='auto_awesome', on_click=self._perform_divination).classes('submit-button').props('unelevated no-caps')
+                        self.status_message = ui.label('准备就绪：填写输入后查看三传。').classes('status-message').props('role=status aria-live=polite')
+
+                    with ui.element('section').classes('reading-panel').props('aria-label=三传结果'):
+                        with ui.row().classes('reading-heading'):
+                            with ui.row().classes('items-center gap-2'):
+                                ui.icon('auto_stories', size='19px')
+                                ui.label('三传观照').classes('reading-heading-title')
+                            ui.label('由始而终，循序而观').classes('reading-heading-note')
+                        self.result_area = ui.column().classes('result-area')
+                        self._display_empty_state()
+                        self.ai_result_area = ui.column().classes('ai-result-area')
+
+                with ui.element('section').classes('wisdom-strip'):
+                    ui.label('观').classes('serif wisdom-mark').props('aria-hidden=true')
+                    with ui.column().classes('gap-1'):
+                        ui.label('知其势，也尽其力。').classes('serif wisdom-title')
+                        ui.label('三传是一种观察问题的方式。带着具体的问题来，带着更清晰的思路前行。').classes('helper-text')
+                    ui.button('了解如何阅读', icon='east', on_click=guide.open).props('flat no-caps').classes('wisdom-button')
+            with ui.element('footer').classes('site-footer'):
+                ui.label('小六壬 · 传统文化探索')
+                ui.label('解读用于梳理思路，现实决定仍需事实依据。')
 
 
 def create_page():
@@ -265,8 +321,8 @@ def create_page():
 def main():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     os.chdir(project_root)
-    ui.page('/', dark=True)(create_page)
-    ui.run(title='小六壬 · 三传', port=8080, host='0.0.0.0', reload=True, favicon='🔮', dark=True)
+    ui.page('/', dark=False)(create_page)
+    ui.run(title='小六壬 · 三传', port=8080, host='0.0.0.0', reload=True, favicon='☯', dark=False)
 
 
 if __name__ in {'__main__', '__mp_main__'}:
