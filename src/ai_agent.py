@@ -16,14 +16,14 @@ from utils.symbol_relations import get_relations
 class SupportedModels(Enum):
     """支持的LLM模型枚举"""
     OPENAI_GPT4O = "openai:gpt-4o"
-    DEEPSEEK_CHAT = "deepseek:deepseek-chat"
+    DEEPSEEK_FLASH = "deepseek:deepseek-flash"  # 指向 DeepSeek-V4.1-Flash
     
     @classmethod
     def get_display_name(cls, model):
         """获取模型的显示名称"""
         names = {
             cls.OPENAI_GPT4O: "OpenAI GPT-4o",
-            cls.DEEPSEEK_CHAT: "DeepSeek Chat"
+            cls.DEEPSEEK_FLASH: "DeepSeek Flash"
         }
         return names.get(model, model.value)
     
@@ -32,7 +32,7 @@ class SupportedModels(Enum):
         """获取模型对应的API密钥环境变量名"""
         keys = {
             cls.OPENAI_GPT4O: "OPENAI_API_KEY",
-            cls.DEEPSEEK_CHAT: "DEEPSEEK_API_KEY"
+            cls.DEEPSEEK_FLASH: "DEEPSEEK_API_KEY"
         }
         return keys.get(model, "")
 

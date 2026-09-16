@@ -152,8 +152,8 @@ uv run src/web.py
 - **API密钥**：`OPENAI_API_KEY`
 - **特点**：高质量解读，响应准确
 
-#### DeepSeek Chat
-- **模型标识**：`deepseek:deepseek-chat`
+#### DeepSeek Flash
+- **模型标识**：`deepseek:deepseek-flash`（指向 DeepSeek-V4.1-Flash）
 - **API密钥**：`DEEPSEEK_API_KEY`
 - **特点**：经济实惠，支持中文优化
 
