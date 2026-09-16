@@ -132,7 +132,9 @@ uv add <package_name>
 - 历法按北京时间UTC+8解释输入，公历范围1900–2099；八字采用lunar-python sect 2（午夜换日），不做真太阳时校正。
 
 ## 验证
-运行 `uv run python -m unittest discover -s tests -v`。改进规格见 `docs/specs/review-improvements.md`。
+运行 `uv run python -m unittest discover -s tests -v`。改进规格见 `docs/specs/review-improvements.md` 与 `docs/specs/interpretation-experience.md`。
+- 三传采用项目九宫法；五行关系以左传为主语，返回生、克、被生、被克、比和。使用共用方向解释，禁止把反向关系当成无关系。
+- AI失败抛出异常交由界面展示，不把错误文本作为成功解读。Prompt使用结构化本地事实，固定三传依据、白话、建议的阅读结构。
 
 ## 算法变更的独立复核
 

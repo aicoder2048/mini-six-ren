@@ -18,11 +18,13 @@ import random
 import os
 import re
 
+from utils.symbol_relations import describe_relation
+
 console = Console()
 
 def format_prediction(result):
     symbols = result.symbols
-    table = Table(title="小六壬三传占卜", show_header=True, box=box.SIMPLE)
+    table = Table(title="小六壬三传 · 项目九宫法", show_header=True, box=box.SIMPLE)
     table.add_column("初传（前期）", style="cyan", justify="center")
     table.add_column("关系", style="red", justify="center")
     table.add_column("中传（中期）", style="green", justify="center")
@@ -47,9 +49,13 @@ def format_prediction(result):
     relations = result.relations
 
     table.add_row(
-        "", f"[bold red]{relations[0]}→[/bold red]",
-        "", f"[bold red]{relations[1]}→[/bold red]",
+        "", relations[0],
+        "", relations[1],
         ""
+    )
+    table.caption = '\n'.join(
+        f'{stage}：{describe_relation(symbols[i], symbols[i + 1], relations[i])}'
+        for i, stage in enumerate(('初传→中传', '中传→末传'))
     )
 
     return table
@@ -371,9 +377,8 @@ def tools_submenu():
 def display_divination_result(table, interpretation):
     console = Console()
     
-    # 设置表格宽度为控制台宽度
+    # 让Rich按面板内部可用宽度排列表格，避免边框挤压文字。
     console_width = console.width
-    table.width = console_width
     
     # 显示占卜结果表格，修改标题
     console.print(Panel(table, title="求问占卜", expand=False, width=console_width))
@@ -383,7 +388,7 @@ def display_divination_result(table, interpretation):
         interpretation_text = Text(interpretation, style="cyan")
         
         # 显示解释面板，宽度与表格相同
-        console.print(Panel(interpretation_text, title="大师解读", border_style="magenta", expand=True, width=console_width))
+        console.print(Panel(interpretation_text, title="AI三传解读", border_style="magenta", expand=True, width=console_width))
 
 console = Console()
 
@@ -441,6 +446,7 @@ def xiaoliu_submenu():
                 except ValueError:
                     console.print("[bold red]请输入三个用逗号分隔的1-999整数。[/bold red]")
         elif sub_choice == 2:
+            console.print('按北京时间 UTC+8 取农历月、日、时辰；闰月沿用同名月份，23点按当日农历日取数。')
             while True:
                 date_input = Prompt.ask("[bold cyan]输入公历日期（格式：YYYY-MM-DD）[/bold cyan]")
                 time_input = Prompt.ask("[bold cyan]输入北京时间（UTC+8，格式：HH:MM）[/bold cyan]")
@@ -465,6 +471,11 @@ def xiaoliu_submenu():
                     console.print(f"[bold red]{result}[/bold red]")
                     console.print("[bold red]请重新输入三个汉字，用逗号分隔。[/bold red]")
 
+        if sub_choice == 2:
+            console.print(Text(f'本次输入：{date_input} {time_input} UTC+8（农历月、日、时辰）'))
+        elif sub_choice == 3:
+            console.print(Text(f'本次输入：{"".join(chars)}（字典笔画）'))
+        console.print(f'起课数字：{num1}、{num2}、{num3}')
         result = HandTechnique.predict(num1, num2, num3)
         display_divination_result(format_prediction(result), None)
         if selected_model is not None:
@@ -472,7 +483,7 @@ def xiaoliu_submenu():
             if question:
                 try:
                     interpretation = DivinationAgent(selected_model).interpret_prediction(result.symbols, question)
-                    console.print(Panel(Text(interpretation), title='大师解读'))
+                    console.print(Panel(Text(interpretation), title='AI三传解读'))
                 except Exception as exc:
                     console.print(f'[red]AI解读失败：{exc}[/red]')
 
