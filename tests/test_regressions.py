@@ -238,12 +238,13 @@ class WebRegressions(unittest.IsolatedAsyncioTestCase):
                 second = create_page()
                 second.question_input.value = 'second question'
                 second.number_inputs[0].value = 9
+                second_initial_content = list(second.result_area.default_slot.children)
             with first_client:
                 await first._perform_divination()
             self.assertEqual(first.divination_result, HandTechnique.predict(1, 2, 3))
             self.assertIsNone(second.divination_result)
             self.assertEqual(second.question_input.value, 'second question')
-            self.assertEqual(len(second.result_area.default_slot.children), 0)
+            self.assertEqual(second.result_area.default_slot.children, second_initial_content)
             with second_client:
                 await second._perform_divination()
             self.assertEqual(second.divination_result, HandTechnique.predict(9, 2, 3))
