@@ -127,7 +127,7 @@ Web先展示本地三传；选择AI并填写问题时再等待完整解读，生
 1. 创建`.env`文件
 2. 添加至少一个AI模型的API密钥：
    ```
-   # OpenAI GPT-4o (推荐)
+   # OpenAI GPT-5.6 (推荐)
    OPENAI_API_KEY=your_openai_api_key_here
    
    # DeepSeek Chat (可选)
@@ -138,8 +138,8 @@ Web先展示本地三传；选择AI并填写问题时再等待完整解读，生
 
 应用支持以下AI模型进行占卜解读：
 
-#### OpenAI GPT-4o
-- **模型标识**：`openai:gpt-4o`
+#### OpenAI GPT-5.6
+- **模型标识**：`openai:gpt-5.6`
 - **API密钥**：`OPENAI_API_KEY`
 - **特点**：高质量解读，响应准确
 

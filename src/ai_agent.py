@@ -16,14 +16,14 @@ INTERPRETATION_MAX_TOKENS = 2400
 
 class SupportedModels(Enum):
     """支持的LLM模型枚举"""
-    OPENAI_GPT4O = "openai:gpt-4o"
+    OPENAI_GPT56 = "openai:gpt-5.6"
     DEEPSEEK_FLASH = "deepseek:deepseek-flash"  # 指向 DeepSeek-V4.1-Flash
     
     @classmethod
     def get_display_name(cls, model):
         """获取模型的显示名称"""
         names = {
-            cls.OPENAI_GPT4O: "OpenAI GPT-4o",
+            cls.OPENAI_GPT56: "OpenAI GPT-5.6",
             cls.DEEPSEEK_FLASH: "DeepSeek Flash"
         }
         return names.get(model, model.value)
@@ -32,7 +32,7 @@ class SupportedModels(Enum):
     def get_api_key_name(cls, model):
         """获取模型对应的API密钥环境变量名"""
         keys = {
-            cls.OPENAI_GPT4O: "OPENAI_API_KEY",
+            cls.OPENAI_GPT56: "OPENAI_API_KEY",
             cls.DEEPSEEK_FLASH: "DEEPSEEK_API_KEY"
         }
         return keys.get(model, "")
@@ -48,7 +48,7 @@ class DivinationDeps:
 class DivinationAgent:
     """小六壬占卜AI解读代理"""
     
-    def __init__(self, model_type: SupportedModels = SupportedModels.OPENAI_GPT4O):
+    def __init__(self, model_type: SupportedModels = SupportedModels.OPENAI_GPT56):
         load_dotenv()
         self.model_type = model_type
         self.agent = Agent(

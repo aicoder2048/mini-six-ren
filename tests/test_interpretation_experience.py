@@ -148,13 +148,13 @@ class WebExperienceContracts(unittest.IsolatedAsyncioTestCase):
 
         with patch.dict(os.environ, {'OPENAI_API_KEY': 'offline-test'}), \
              patch('ai_agent.load_dotenv'), \
-             patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT4O]), \
+             patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT56]), \
              patch.object(models, 'ALLOW_MODEL_REQUESTS', False):
             agent = DivinationAgent()
             with agent.agent.override(model=FunctionModel(stream_function=failing_stream)):
                 with Client(ui.page('/provider-failure'), request=None):
                     app = create_page()
-                    app.current_model = SupportedModels.OPENAI_GPT4O
+                    app.current_model = SupportedModels.OPENAI_GPT56
                     app.question_input.value = '准备求职'
                     with patch('web.DivinationAgent', return_value=agent):
                         await app._perform_divination()

@@ -188,7 +188,7 @@ class WebRegressions(unittest.IsolatedAsyncioTestCase):
             yield Stream()
 
         agent = DivinationAgent.__new__(DivinationAgent)
-        agent.model_type = SupportedModels.OPENAI_GPT4O
+        agent.model_type = SupportedModels.OPENAI_GPT56
         agent.agent = SimpleNamespace(run_stream=run_stream)
         output = io.StringIO()
         console = Console(file=output)
@@ -260,7 +260,7 @@ class WebRegressions(unittest.IsolatedAsyncioTestCase):
             await release.wait()
             raise RuntimeError('simulated outage')
 
-        with patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT4O]), \
+        with patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT56]), \
              patch('web.DivinationAgent.__init__', return_value=None), \
              patch('web.DivinationAgent.interpret_prediction_async', side_effect=failing_ai) as ai:
             with Client(ui.page('/ai-failure'), request=None):
@@ -284,7 +284,7 @@ class WebRegressions(unittest.IsolatedAsyncioTestCase):
         from ai_agent import SupportedModels
         from types import SimpleNamespace
         from web import create_page
-        with patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT4O]), \
+        with patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT56]), \
              patch('web.DivinationAgent.interpret_prediction_async', new_callable=AsyncMock) as ai:
             with Client(ui.page('/skip-ai'), request=None):
                 app = create_page()

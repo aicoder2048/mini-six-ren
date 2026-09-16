@@ -137,7 +137,7 @@ third  = __calculate_symbol((num1 + num2 - 2) % 9, num3)     # 从第二传落�
 | `five_elements.py` | 从 `data/five_elements.json` 加载 5 个 `FiveElement`（含 `generates` / `overcomes`，以及 `meanings` / `promotes` / `taboos` 按"健康、权力地位、财富、事业工作、人际关系"分类）。模块级 `FIVE_ELEMENTS` | `symbols.py`、`cli.py`、`five_elements_utils.py` |
 | `symbols.py` | 加载 9 个 `Symbol`，`element` 字段指向 `FiveElement` 对象。模块级 `SYMBOLS`。**唯一用 `Path(__file__)` 定位数据文件的模块** | `hand_technique.py` |
 | `hand_technique.py` | 算符号、算关系、造 rich 表格、调 AI | 两个 UI |
-| `ai_agent.py` | `SupportedModels` 枚举（`openai:gpt-4o`、`deepseek:deepseek-flash`）；`DivinationAgent` 用 pydantic-ai `Agent` 封装。`get_available_models()` 靠 `.env` 里有无对应 API key 判断可用性。system prompt 要求输出 `###` 标题 + `**粗体**` + 列表，≤1000 字 | `hand_technique.py`、两个 UI（模型选择） |
+| `ai_agent.py` | `SupportedModels` 枚举（`openai:gpt-5.6`、`deepseek:deepseek-flash`）；`DivinationAgent` 用 pydantic-ai `Agent` 封装。`get_available_models()` 靠 `.env` 里有无对应 API key 判断可用性。system prompt 要求输出 `###` 标题 + `**粗体**` + 列表，≤1000 字 | `hand_technique.py`、两个 UI（模型选择） |
 | `utils/calendar_converter.py` | `solar_to_lunar` 用 `lunardate`；另含一份 `calculate_bazi` / `analyze_wuxing` / `format_bazi_output`（重复，见 §7-2） | 两个 UI（只用 `solar_to_lunar`） |
 | `utils/stroke_count.py` | `getbihua(char)` 逐行扫字典，取第二列第 8–9 位为笔画数；找不到返回 `-1` | 两个 UI |
 | `utils/bazi_calculator.py` | `calculate_bazi`（简化公式）、`get_chinese_year`、`analyze_day_master_strength`、`analyze_spouse_palace` | 仅 CLI "八字测算" |
