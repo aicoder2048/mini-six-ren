@@ -1,43 +1,30 @@
+from pathlib import Path
+from .validation import validate_chinese
+
+
+def _load_strokes() -> dict[str, int]:
+    path = Path(__file__).resolve().parents[2] / 'data' / 'hanzi_dictionary.txt'
+    strokes = {}
+    with path.open(encoding='utf-8') as source:
+        for line in source:
+            parts = line.split()
+            if len(parts) >= 2:
+                strokes.setdefault(parts[0], int(parts[1][7:9]))
+    return strokes
+
+
+STROKE_COUNTS = _load_strokes()
+
+
 def getbihua(char: str) -> int:
-    dictionary_path = 'data/hanzi_dictionary.txt'
-    
-    with open(dictionary_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            parts = line.strip().split()
-            if len(parts) >= 2 and parts[0] == char:
-                # The stroke count is the 8th and 9th characters of the second part
-                return int(parts[1][7:9])
-    
-    # If the character is not found in the dictionary
-    return -1
+    try:
+        return STROKE_COUNTS[char]
+    except KeyError:
+        raise ValueError(f'字典中没有汉字「{char}」的笔画数') from None
+
 
 def get_stroke_counts(chars: str) -> list[int]:
-    """
-    获取最多3个中文字符的笔画数。
-
-    参数:
-    chars (str): 输入的中文字符串，最多3个字符
-
-    返回:
-    list[int]: 每个字符的笔画数列表
-
-    示例:
-    >>> get_stroke_counts("你好")
-    [7, 8]
-    >>> get_stroke_counts("中国人")
-    [4, 8, 2]
-    >>> get_stroke_counts("一")
-    [1]
-    """
-    if len(chars) > 3:
-        chars = chars[:3]
-    
-    stroke_counts = []
-    for char in chars:
-        stroke_count = getbihua(char)
-        stroke_counts.append(stroke_count)
-    
-    return stroke_counts
+    return [getbihua(char) for char in validate_chinese(chars, exact_three=False)]
 
 
 def format_stroke_count_output(chars: str, stroke_counts: list[int]) -> str:

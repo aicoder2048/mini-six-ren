@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 class Bagua:
     def __init__(self, name, symbol, nature, direction, family_member, body_part, animal):
@@ -12,7 +13,7 @@ class Bagua:
 
     @classmethod
     def load_bagua(cls):
-        with open('data/bagua.json', 'r', encoding='utf-8') as f:
+        with open(Path(__file__).resolve().parent.parent / 'data' / 'bagua.json', 'r', encoding='utf-8') as f:
             bagua_data = json.load(f)
         return [cls(**data) for data in bagua_data]
 

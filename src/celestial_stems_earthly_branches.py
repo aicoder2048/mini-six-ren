@@ -1,9 +1,16 @@
 import json
+from pathlib import Path
+
 
 class CelestialStem:
     def __init__(self, name, element):
         self.name = name
         self.element = element
+
+    @classmethod
+    def load(cls, records):
+        return [cls(**record) for record in records]
+
 
 class EarthlyBranch:
     def __init__(self, name, element, zodiac):
@@ -11,13 +18,12 @@ class EarthlyBranch:
         self.element = element
         self.zodiac = zodiac
 
-def load_celestial_stems_earthly_branches():
-    with open('data/celestial_stems_earthly_branches.json', 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    
-    stems = [CelestialStem(**stem) for stem in data['celestial_stems']]
-    branches = [EarthlyBranch(**branch) for branch in data['earthly_branches']]
-    
-    return stems, branches
+    @classmethod
+    def load(cls, records):
+        return [cls(**record) for record in records]
 
-CELESTIAL_STEMS, EARTHLY_BRANCHES = load_celestial_stems_earthly_branches()
+
+with (Path(__file__).resolve().parent.parent / 'data' / 'celestial_stems_earthly_branches.json').open(encoding='utf-8') as source:
+    _data = json.load(source)
+CELESTIAL_STEMS = CelestialStem.load(_data['celestial_stems'])
+EARTHLY_BRANCHES = EarthlyBranch.load(_data['earthly_branches'])

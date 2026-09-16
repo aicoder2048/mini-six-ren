@@ -8,7 +8,7 @@ import os
 import sys
 import re
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 
 # Add the src directory to the path to import our modules
@@ -20,12 +20,15 @@ from nicegui.events import ValueChangeEventArguments
 from hand_technique import HandTechnique
 from ai_agent import DivinationAgent, SupportedModels
 from utils.stroke_count import get_stroke_counts
-from utils.calendar_converter import solar_to_lunar
+from utils.calendar_converter import date_to_numbers
+from utils.validation import validate_numbers, validate_chinese
 
 
 class DivinationWebApp:
     def __init__(self):
         self.current_model = None
+        self.is_running = False
+        self.submit_button = None
         self.available_models = []
         self.divination_result = None
         self.ai_interpretation = None
@@ -51,136 +54,69 @@ class DivinationWebApp:
         if self.available_models:
             self.current_model = self.available_models[0]
     
-    def _validate_numbers(self, num1_str, num2_str, num3_str) -> tuple[bool, str, List[int]]:
-        """Validate number inputs"""
+    def _validate_numbers(self, *values) -> tuple[bool, str, List[int]]:
         try:
-            nums = [int(n) for n in [num1_str, num2_str, num3_str]]
-            if all(1 <= n <= 999 for n in nums):
-                return True, "", nums
-            else:
-                return False, "数字必须在1-999之间", []
-        except ValueError:
-            return False, "请输入有效数字", []
-    
+            return True, '', validate_numbers(values)
+        except ValueError as exc:
+            return False, str(exc), []
+
     def _validate_chinese(self, text: str) -> tuple[bool, str, List[int]]:
-        """Validate Chinese character input"""
-        if not text or len(text) < 3:
-            return False, "请输入3个汉字", []
-        
-        # Check if all characters are Chinese
-        chinese_chars = [c for c in text if '\u4e00' <= c <= '\u9fff']
-        if len(chinese_chars) < 3:
-            return False, "请输入3个汉字", []
-        
-        # Get stroke counts for first 3 characters
-        first_three = chinese_chars[:3]
         try:
-            stroke_counts = get_stroke_counts(first_three)
-            if not stroke_counts:
-                return False, "无法计算汉字笔画数", []
-            return True, "", stroke_counts
-        except Exception as e:
-            return False, f"笔画计算错误: {str(e)}", []
-    
+            return True, '', get_stroke_counts(validate_chinese(text))
+        except ValueError as exc:
+            return False, str(exc), []
+
     def _validate_date_time(self, date_str: str, time_str: str) -> tuple[bool, str, List[int]]:
-        """Validate date and time input"""
         try:
-            if not date_str or not time_str:
-                return False, "请选择日期和时间", []
-            
-            # Parse date and time
-            date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-            time_obj = datetime.strptime(time_str, "%H:%M")
-            
-            # Calculate numbers based on date and time
-            month = date_obj.month
-            day = date_obj.day
-            hour = time_obj.hour
-            
-            # Convert to 1-9 range
-            num1 = (month - 1) % 9 + 1
-            num2 = (day - 1) % 9 + 1
-            num3 = (hour % 12) // 2 + 1  # Convert to traditional 12-hour periods
-            
-            return True, "", [num1, num2, num3]
-        except ValueError:
-            return False, "日期或时间格式错误", []
-    
+            return True, '', date_to_numbers(date_str, time_str)
+        except ValueError as exc:
+            return False, str(exc), []
+
     async def _perform_divination(self):
-        """Perform divination based on current input"""
+        if self.is_running:
+            return
+        self.is_running = True
+        self.submit_button.disable()
         try:
-            # Clear previous results
             self.result_area.clear()
             self.ai_result_area.clear()
-            if self.error_message:
-                self.error_message.set_text("")
-            
-            # Force UI update
-            await asyncio.sleep(0)
-            
-            # Get current input values
+            self.error_message.set_text('')
+            self.divination_result = None
+            self.ai_interpretation = None
             current_tab = self.input_tabs.value
-            question = self.question_input.value.strip()
-            
-            if not question:
-                self._show_error("请输入您要占卜的问题")
-                return
-            
-            # Validate inputs based on current tab
-            if current_tab == "numbers":
-                valid, error_msg, numbers = self._validate_numbers(
-                    self.number_inputs[0].value,
-                    self.number_inputs[1].value,
-                    self.number_inputs[2].value
-                )
-            elif current_tab == "date":
-                valid, error_msg, numbers = self._validate_date_time(
-                    self.date_input.value,
-                    self.time_input.value
-                )
-            elif current_tab == "chinese":
-                valid, error_msg, numbers = self._validate_chinese(
-                    self.chinese_input.value
-                )
+            question = (self.question_input.value or '').strip()
+            model = self.current_model
+            if current_tab == 'numbers':
+                valid, error_msg, numbers = self._validate_numbers(*(field.value for field in self.number_inputs))
+            elif current_tab == 'date':
+                valid, error_msg, numbers = self._validate_date_time(self.date_input.value, self.time_input.value)
+            elif current_tab == 'chinese':
+                valid, error_msg, numbers = self._validate_chinese(self.chinese_input.value)
             else:
-                self._show_error("请选择输入方式")
+                self._show_error('请选择输入方式')
                 return
-            
             if not valid:
                 self._show_error(error_msg)
                 return
-            
-            # Show loading with modern design
-            self.result_area.clear()
-            with self.result_area:
-                with ui.card().classes('w-full bento-card rounded-2xl p-12 text-center'):
-                    ui.spinner('dots', size='lg').props('color=purple')
-                    ui.label('正在连接天地智慧...').classes('text-xl text-gray-300 mt-4')
-            
-            # Force UI update to show spinner
-            await asyncio.sleep(0.1)
-            
-            # Perform divination
-            if not self.current_model:
-                self._show_error("请先配置AI模型")
-                return
-            
-            # Get divination result
-            table, ai_result = await HandTechnique.predict_async(
-                numbers[0], numbers[1], numbers[2], 
-                question, self.current_model
-            )
-            
-            # Get the actual symbols for better display
-            symbols = HandTechnique._HandTechnique__generate_prediction(numbers[0], numbers[1], numbers[2])
-            relations = HandTechnique._HandTechnique__get_relations(symbols)
-            
-            # Display results
-            self._display_results(symbols, relations, ai_result)
-            
-        except Exception as e:
-            self._show_error(f"占卜计算错误: {str(e)}")
-    
+            result = HandTechnique.predict(*numbers)
+            self.divination_result = result
+            self._display_results(result.symbols, result.relations, None)
+            if model is not None and question:
+                with self.ai_result_area:
+                    ui.spinner('dots').props('color=purple')
+                    ui.label('正在生成AI解读...')
+                await asyncio.sleep(0)
+                interpretation = await DivinationAgent(model).interpret_prediction_async(result.symbols, question)
+                self.ai_interpretation = interpretation
+                self.ai_result_area.clear()
+                self._display_ai_result(interpretation)
+        except Exception as exc:
+            self.ai_result_area.clear()
+            self._show_error(f'计算或AI解读失败: {exc}')
+        finally:
+            self.is_running = False
+            self.submit_button.enable()
+
     def _display_results(self, symbols, relations, ai_result):
         """Display divination results"""
         self.result_area.clear()
@@ -312,13 +248,11 @@ class DivinationWebApp:
     
     def _on_model_change(self, e: ValueChangeEventArguments):
         """Handle model selection change"""
-        for model in self.available_models:
-            if SupportedModels.get_display_name(model) == e.value:
-                self.current_model = model
-                break
-    
+        self.current_model = next((model for model in self.available_models if model.value == e.value), None)
+
     def create_ui(self):
         """Create the main UI"""
+        now = datetime.now(timezone(timedelta(hours=8)))
         # Set up modern gradient color scheme
         ui.colors(primary='#7c3aed', secondary='#06b6d4', accent='#f59e0b', 
                  dark='#1e1b4b', positive='#10b981', negative='#ef4444', 
@@ -472,20 +406,16 @@ class DivinationWebApp:
                 # Model selection in a beautiful card
                 with ui.card().classes('w-full bento-card rounded-2xl p-6 mb-6'):
                     ui.label('AI模型选择').classes('text-xl font-semibold text-white mb-4')
-                    if self.available_models:
-                        model_options = [SupportedModels.get_display_name(model) 
-                                       for model in self.available_models]
-                        self.model_select = ui.select(
-                            model_options, 
-                            label='',
-                            value=model_options[0] if model_options else None,
-                            on_change=self._on_model_change
-                        ).classes('w-full').props('dark filled')
-                    else:
-                        with ui.card().classes('w-full bg-red-500/20 border-red-500/50 rounded-xl p-4'):
-                            ui.label('⚠️ 未找到可用的AI模型，请检查API密钥配置').classes('text-red-300')
-                        return
-            
+                    model_options = {'local': '仅本地计算（不使用AI）'}
+                    model_options.update({model.value: SupportedModels.get_display_name(model) for model in self.available_models})
+                    self.model_select = ui.select(
+                        model_options,
+                        value=self.current_model.value if self.current_model else 'local',
+                        on_change=self._on_model_change
+                    ).classes('w-full').props('dark filled')
+                    if not self.available_models:
+                        ui.label('本地模式：无需API密钥，仍可计算三传和五行关系。').classes('text-gray-300')
+
                 # Input section with modern tabs
                 with ui.card().classes('w-full bento-card rounded-2xl p-6 mb-6'):
                     ui.label('占卜输入').classes('text-xl font-semibold text-white mb-4')
@@ -514,17 +444,17 @@ class DivinationWebApp:
                 
                         # Date input panel
                         with ui.tab_panel('date'):
-                            ui.label('请选择日期和时间').classes('text-gray-300 mb-4')
+                            ui.label('请选择北京时间（UTC+8），日期范围1900-2099').classes('text-gray-300 mb-4')
                             with ui.row().classes('w-full gap-4'):
                                 with ui.column().classes('flex-1'):
                                     ui.label('日期').classes('text-sm text-gray-400 mb-1')
                                     self.date_input = ui.date(
-                                        value=datetime.now().strftime('%Y-%m-%d')
+                                        value=now.strftime('%Y-%m-%d')
                                     ).classes('w-full').props('dark filled')
                                 with ui.column().classes('flex-1'):
                                     ui.label('时间').classes('text-sm text-gray-400 mb-1')
                                     self.time_input = ui.time(
-                                        value=datetime.now().strftime('%H:%M')
+                                        value=now.strftime('%H:%M')
                                     ).classes('w-full').props('dark filled')
                 
                         # Chinese characters input panel
@@ -541,33 +471,30 @@ class DivinationWebApp:
                 with ui.card().classes('w-full bento-card rounded-2xl p-6 mb-6'):
                     with ui.row().classes('items-center gap-3 mb-4'):
                         ui.icon('psychology', size='2rem').classes('text-purple-400')
-                        ui.label('您的问题').classes('text-xl font-semibold text-white')
+                        ui.label('您的问题（可选，用于AI解读）').classes('text-xl font-semibold text-white')
                     
                     self.question_input = ui.textarea(
                         label='',
-                        placeholder='请详细描述您要占卜的问题...\n例如：今日运势如何？工作项目能否顺利？感情发展趋势？',
-                        validation={'请输入问题': lambda value: len(value.strip()) > 0}
+                        placeholder='填写问题以请求AI解读；留空仅计算三传。'
                     ).classes('w-full').props('dark filled autogrow rows=3')
             
                 # Error message area
                 self.error_message = ui.label('').classes('text-red-400 text-center font-semibold mb-4')
                 
-                # Divination button with gradient
-                def on_divination_click():
-                    asyncio.create_task(self._perform_divination())
-                
-                with ui.element('button').classes(
-                    'w-full gradient-purple text-white font-bold py-4 px-8 rounded-2xl '
-                    'text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 '
-                    'transition-all duration-200'
-                ).on('click', on_divination_click):
-                    with ui.row().classes('justify-center items-center gap-3'):
-                        ui.icon('auto_fix_high', size='1.5rem')
-                        ui.label('开始占卜')
-            
+                self.submit_button = ui.button('开始占卜', icon='auto_fix_high', on_click=self._perform_divination).classes(
+                    'w-full gradient-purple text-white font-bold py-4 px-8 rounded-2xl text-lg shadow-lg'
+                )
+
                 # Results area
                 self.result_area = ui.column().classes('w-full mt-8')
                 self.ai_result_area = ui.column().classes('w-full')
+
+
+def create_page():
+    """Each page owns its controller and every callback's widget references."""
+    web_app = DivinationWebApp()
+    web_app.create_ui()
+    return web_app
 
 
 def main():
@@ -576,14 +503,8 @@ def main():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     os.chdir(project_root)
     
-    # Create the application
-    web_app = DivinationWebApp()
-    
-    # Set up the main page with dark theme
-    @ui.page('/', dark=True)
-    def index():
-        web_app.create_ui()
-    
+    ui.page('/', dark=True)(create_page)
+
     # Configure and run the application
     ui.run(
         title='小六壬占卜 Web版',

@@ -1,9 +1,8 @@
 from hand_technique import HandTechnique
 from ai_agent import DivinationAgent, SupportedModels
 from five_elements import FIVE_ELEMENTS
-from utils.calendar_converter import solar_to_lunar, calculate_bazi, analyze_wuxing, format_bazi_output
+from utils.calendar_converter import solar_to_lunar, lunar_to_solar, date_to_numbers
 from utils.stroke_count import get_stroke_counts, format_stroke_count_output
-from utils.calendar_converter import solar_to_lunar
 from utils.bazi_calculator import calculate_bazi, analyze_day_master_strength, analyze_spouse_palace, get_chinese_year
 from utils.five_elements_utils import analyze_wuxing, analyze_missing_wuxing, get_wuxing, print_generation_cycle, print_overcoming_cycle, get_supporting_elements, get_weakening_elements
 from rich import box
@@ -13,12 +12,48 @@ from rich.text import Text
 from rich.prompt import Prompt
 from rich.style import Style
 from rich.table import Table 
+from utils.validation import parse_datetime, normalize_gender, validate_numbers, validate_chinese
 from datetime import datetime 
 import random
 import os
 import re
 
 console = Console()
+
+def format_prediction(result):
+    symbols = result.symbols
+    table = Table(title="小六壬三传占卜", show_header=True, box=box.SIMPLE)
+    table.add_column("初传（前期）", style="cyan", justify="center")
+    table.add_column("关系", style="red", justify="center")
+    table.add_column("中传（中期）", style="green", justify="center")
+    table.add_column("关系", style="red", justify="center")
+    table.add_column("末传（后期）", style="magenta", justify="center")
+
+    # 添加符号名称
+    table.add_row(
+        f"【{symbols[0].name}】", "",
+        f"【{symbols[1].name}】", "",
+        f"【{symbols[2].name}】"
+    )
+
+    # 添加五行属性
+    table.add_row(
+        f"（{symbols[0].element.name}）", "",
+        f"（{symbols[1].element.name}）", "",
+        f"（{symbols[2].element.name}）"
+    )
+
+    # 添加生克关系
+    relations = result.relations
+
+    table.add_row(
+        "", f"[bold red]{relations[0]}→[/bold red]",
+        "", f"[bold red]{relations[1]}→[/bold red]",
+        ""
+    )
+
+    return table
+
 
 def create_gradient_text(text, start_color=(100, 100, 255), end_color=(255, 100, 100)):
     gradient_text = Text(text, style="bold")
@@ -86,21 +121,35 @@ def solar_to_lunar_conversion():
     date_str = Prompt.ask("[bold cyan]请输入公历日期（格式：YYYY-MM-DD）[/bold cyan]")
     
     try:
-        year, month, day = map(int, date_str.split('-'))
+        date_value = parse_datetime(date_str)
+        year, month, day = date_value.year, date_value.month, date_value.day
         lunar_year, lunar_month, lunar_day, is_leap = solar_to_lunar(year, month, day)
         
         console.print(f"\n[bold green]公历日期：[/bold green]{year}年{month}月{day}日")
         console.print(f"[bold green]农历日期：[/bold green]{lunar_year}年{'闰' if is_leap else ''}{lunar_month}月{lunar_day}日")
     except ValueError:
         console.print("[bold red]输入格式错误，请确保输入正确的日期格式（YYYY-MM-DD）。[/bold red]")
+def lunar_to_solar_conversion():
+    date_str = Prompt.ask('[bold cyan]请输入农历日期（YYYY-MM-DD）[/bold cyan]')
+    leap = Prompt.ask('是否闰月', choices=['y', 'n'], default='n') == 'y'
+    try:
+        year, month, day = map(int, date_str.split('-'))
+        year, month, day = lunar_to_solar(year, month, day, leap)
+        console.print(f'[bold green]公历日期：{year:04d}-{month:02d}-{day:02d}[/bold green]')
+    except ValueError as exc:
+        console.print(f'[red]日期输入错误：{exc}[/red]')
+
+
 def bazi_calculation():
     date_str = Prompt.ask("[bold cyan]请输入公历日（格式：YYYY-MM-DD）[/bold cyan]")
-    time_str = Prompt.ask("[bold cyan]请输入时间（格式：HH:MM）[/bold cyan]")
+    time_str = Prompt.ask("[bold cyan]请输入北京时间（UTC+8，格式：HH:MM）[/bold cyan]")
     gender = Prompt.ask("[bold cyan]请输入性别（M/F）[/bold cyan]")
     
     try:
-        year, month, day = map(int, date_str.split('-'))
-        hour, minute = map(int, time_str.split(':'))
+        time_value = parse_datetime(date_str, time_str)
+        year, month, day = time_value.year, time_value.month, time_value.day
+        hour, minute = time_value.hour, time_value.minute
+        gender = normalize_gender(gender)
         
         lunar_date = solar_to_lunar(year, month, day)
         bazi = calculate_bazi(year, month, day, hour, minute)
@@ -116,7 +165,7 @@ def bazi_calculation():
         
         sections = [
             ("基本信息", [
-                ("性别", "男" if gender.upper() == 'M' else "女"),
+                ("性别", gender),
                 ("公历生日", f"{year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}"),
                 ("农历生日", f"{lunar_date[0]}年{'闰' if lunar_date[3] else ''}{lunar_date[1]}月{lunar_date[2]}日")
             ]),
@@ -155,10 +204,8 @@ def stroke_count_calculation():
     计算用户输入的中文字符的笔画数并显示结果。
     """
     chars = Prompt.ask("[bold cyan]请输入1到3个中文字符[/bold cyan]")
-    if not 1 <= len(chars) <= 3:
-        console.print("[bold red]请输入1到3个中文字符[/bold red]")
-        return
     try:
+        chars = validate_chinese(chars, exact_three=False)
         stroke_counts = get_stroke_counts(chars)
         output = format_stroke_count_output(chars, stroke_counts)
         console.print(f"\n[bold green]笔画数计算结果：[/bold green]")
@@ -264,7 +311,8 @@ def analyze_day_master():
     date_str = Prompt.ask("[bold cyan]请输入公历日期（格式：YYYY-MM-DD）[/bold cyan]")
     
     try:
-        year, month, day = map(int, date_str.split('-'))
+        date_value = parse_datetime(date_str)
+        year, month, day = date_value.year, date_value.month, date_value.day
         lunar_year, lunar_month, lunar_day, _ = solar_to_lunar(year, month, day)
         
         console.print(Panel.fit(
@@ -305,8 +353,8 @@ def analyze_day_master():
 def tools_submenu():
     while True:
         console.print("\n")
-        display_menu(["笔画数计算", "公历转农历", "五行信息", "日主五行分析"], "工具子菜单", level=2)
-        sub_choice = get_menu_choice(["笔画数计算", "公历转农历", "五行信息", "日主五行分析"], level=2)
+        display_menu(["笔画数计算", "公历转农历", "五行信息", "日主五行分析", "农历转公历"], "工具子菜单", level=2)
+        sub_choice = get_menu_choice(["笔画数计算", "公历转农历", "五行信息", "日主五行分析", "农历转公历"], level=2)
         if sub_choice == 'home':
             break
         elif sub_choice == 1:
@@ -317,6 +365,8 @@ def tools_submenu():
             print_five_elements_info()
         elif sub_choice == 4:
             analyze_day_master()
+        elif sub_choice == 5:
+            lunar_to_solar_conversion()
 
 def display_divination_result(table, interpretation):
     console = Console()
@@ -338,18 +388,10 @@ def display_divination_result(table, interpretation):
 console = Console()
 
 def validate_chinese_chars(chars_input):
-    chars = [char.strip() for char in re.split(r'[,，]', chars_input) if char.strip()]
-    
-    if len(chars) != 3:
-        return False, f"输入格式错误：您输入了 {len(chars)} 个字符，请确保输入 3 个汉字。"
-    elif not all(len(char) == 1 for char in chars):
-        invalid_chars = [char for char in chars if len(char) != 1]
-        return False, f"输入格式错误：'{', '.join(invalid_chars)}' 不是单个汉字。请确保每个入都是单个汉字。"
-    elif not all('\u4e00' <= char <= '\u9fff' for char in chars):
-        non_chinese = [char for char in chars if not '\u4e00' <= char <= '\u9fff']
-        return False, f"输入格式错误：'{', '.join(non_chinese)}' 不是汉字。请确保输入的是汉字。"
-    else:
-        return True, chars
+    try:
+        return True, list(validate_chinese(chars_input))
+    except ValueError as exc:
+        return False, str(exc)
 
 def main():
     clear_screen()
@@ -368,40 +410,14 @@ def main():
             tools_submenu()
 
 def select_llm_model():
-    """选择LLM模型"""
     available_models = DivinationAgent.get_available_models()
-    
     if not available_models:
-        console.print("[bold red]错误：未检测到任何可用的LLM模型！[/bold red]")
-        console.print("[yellow]请确保已在.env文件中设置以下至少一个API密钥：[/yellow]")
-        for model in SupportedModels:
-            api_key_name = SupportedModels.get_api_key_name(model)
-            model_name = SupportedModels.get_display_name(model)
-            console.print(f"  - {api_key_name} (用于{model_name})")
+        console.print('[cyan]本地模式：无需API密钥，仍可计算三传和五行关系。[/cyan]')
         return None
-    
-    if len(available_models) == 1:
-        # 只有一个模型可用，直接使用
-        model = available_models[0]
-        model_name = SupportedModels.get_display_name(model)
-        console.print(f"[cyan]当前可用模型：{model_name}[/cyan]")
-        return model
-    
-    # 显示模型选择菜单
-    console.print("\n")
-    model_names = [SupportedModels.get_display_name(model) for model in available_models]
-    display_menu(model_names, "请选择AI模型", level=2)
-    
-    choice = get_menu_choice(model_names, level=2)
-    if choice == 'home':
-        return None
-    elif isinstance(choice, int) and 1 <= choice <= len(available_models):
-        selected_model = available_models[choice - 1]
-        model_name = SupportedModels.get_display_name(selected_model)
-        console.print(f"[green]已选择：{model_name}[/green]")
-        return selected_model
-    
-    return None
+    model_names = ['仅本地计算（不使用AI）'] + [SupportedModels.get_display_name(model) for model in available_models]
+    display_menu(model_names, '请选择解读方式')
+    choice = get_menu_choice(model_names)
+    return None if choice == 1 else available_models[choice - 2]
 
 def xiaoliu_submenu():
     while True:
@@ -413,30 +429,23 @@ def xiaoliu_submenu():
         
         # 选择LLM模型
         selected_model = select_llm_model()
-        if selected_model is None:
-            console.print("[yellow]未选择模型，返回主菜单[/yellow]")
-            return
-        elif sub_choice == 1:
+        if sub_choice == 1:
             while True:
                 numbers_input = Prompt.ask(
                     "[bold cyan]输入三个数字（逗号间隔）[/bold cyan]",
                     default="1,2,3"
                 )
                 try:
-                    num1, num2, num3 = map(int, numbers_input.split(','))
+                    num1, num2, num3 = validate_numbers(numbers_input.split(','))
                     break
                 except ValueError:
-                    console.print("[bold red]输入格式错误，请确保输入三个用逗号分隔的数字。[/bold red]")
+                    console.print("[bold red]请输入三个用逗号分隔的1-999整数。[/bold red]")
         elif sub_choice == 2:
             while True:
                 date_input = Prompt.ask("[bold cyan]输入公历日期（格式：YYYY-MM-DD）[/bold cyan]")
-                time_input = Prompt.ask("[bold cyan]输入时间（格式：HH:MM）[/bold cyan]")
+                time_input = Prompt.ask("[bold cyan]输入北京时间（UTC+8，格式：HH:MM）[/bold cyan]")
                 try:
-                    date_time = datetime.strptime(f"{date_input} {time_input}", "%Y-%m-%d %H:%M")
-                    lunar_year, lunar_month, lunar_day, _ = solar_to_lunar(date_time.year, date_time.month, date_time.day)
-                    num1 = lunar_month
-                    num2 = lunar_day
-                    num3 = (date_time.hour + 1) % 24 // 2 + 1  # 转换为地支序号
+                    num1, num2, num3 = date_to_numbers(date_input, time_input)
                     break
                 except ValueError:
                     console.print("[bold red]日期或时间格式错误，请重新输入。[/bold red]")
@@ -456,14 +465,17 @@ def xiaoliu_submenu():
                     console.print(f"[bold red]{result}[/bold red]")
                     console.print("[bold red]请重新输入三个汉字，用逗号分隔。[/bold red]")
 
-        # 获取用户的具体求问事项
-        question = Prompt.ask("[bold cyan]请描述您想占卜的具体事项[/bold cyan]")
+        result = HandTechnique.predict(num1, num2, num3)
+        display_divination_result(format_prediction(result), None)
+        if selected_model is not None:
+            question = Prompt.ask('[bold cyan]请描述求问事项（留空跳过AI）[/bold cyan]', default='').strip()
+            if question:
+                try:
+                    interpretation = DivinationAgent(selected_model).interpret_prediction(result.symbols, question)
+                    console.print(Panel(Text(interpretation), title='大师解读'))
+                except Exception as exc:
+                    console.print(f'[red]AI解读失败：{exc}[/red]')
 
-        # 使用生成的数字进行小六壬占卜，传入选择的模型
-        table, interpretation = HandTechnique.predict(num1, num2, num3, question, selected_model)
-        
-        # 显示占卜结果解读
-        display_divination_result(table, interpretation)
 
 def set_current_working_dir():
     import os

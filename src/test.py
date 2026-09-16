@@ -1,6 +1,6 @@
-def __is_generating(element1, element2):
-    generating_cycle = {"木": "火", "火": "土", "土": "金", "金": "水", "水": "木"}
-    return generating_cycle[element1] == element2
+"""Small manual prediction example; automated tests live in tests/."""
+from hand_technique import HandTechnique
 
-relation = "生" if __is_generating("木", "金") else "克"
-print(relation)
+if __name__ == '__main__':
+    prediction = HandTechnique.predict(3, 5, 8)
+    print([symbol.name for symbol in prediction.symbols], prediction.relations)

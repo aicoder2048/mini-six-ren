@@ -15,11 +15,11 @@ class Symbol:
         self.finger_position = finger_position
         self.order = order
 
-def load_symbols():
-    data_path = Path(__file__).parent.parent / 'data' / 'symbols.json'
-    with open(data_path, 'r', encoding='utf-8') as f:
-        symbols_data = json.load(f)
-    
-    return [Symbol(**data) for data in symbols_data]
+    @classmethod
+    def load_symbols(cls):
+        data_path = Path(__file__).resolve().parent.parent / 'data' / 'symbols.json'
+        with data_path.open(encoding='utf-8') as source:
+            return [cls(**data) for data in json.load(source)]
 
-SYMBOLS = load_symbols()
+
+SYMBOLS = Symbol.load_symbols()

@@ -39,10 +39,6 @@ def build_orders():
 
 GENERATION_ORDER, OVERCOMING_ORDER = build_orders()
 
-# 添加这个打印语句来检查顺序是否正确
-print(f"Generation Order: {GENERATION_ORDER}")
-print(f"Overcoming Order: {OVERCOMING_ORDER}")
-
 def get_wuxing(stem_branch: str) -> Tuple[str, str]:
     return WUXING[stem_branch[0]], WUXING[stem_branch[1]]
 

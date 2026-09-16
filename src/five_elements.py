@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from typing import List, Dict, Any
 
 class FiveElement:
@@ -17,7 +18,7 @@ class FiveElement:
 
     @classmethod
     def load_five_elements(cls) -> List['FiveElement']:
-        with open('data/five_elements.json', 'r', encoding='utf-8') as f:
+        with open(Path(__file__).resolve().parent.parent / 'data' / 'five_elements.json', 'r', encoding='utf-8') as f:
             elements_data = json.load(f)
         return [cls(data['name'], data) for data in elements_data]
 

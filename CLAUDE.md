@@ -15,7 +15,7 @@ Mini Six Ren（小六壬）是一个基于Python的中国传统占卜应用，�
 - 运行项目：`uv run src/cli.py`
 
 ### 核心依赖
-- `sxtwl`: 中国传统历法计算库
+- `lunar-python`: 中国传统历法计算库
 - `openai`: 用于AI解读功能
 - `rich`: 终端UI美化库
 - `python-dotenv`: 环境变量管理
@@ -58,7 +58,7 @@ data/
 - 计算五行生克关系
 
 ### 2. 八字测算系统 (bazi_calculator.py)
-- 使用sxtwl库进行精确的历法计算
+- 使用lunar-python库进行精确的历法计算
 - 分析日主强弱、配偶宫位等
 - 五行缺失分析和影响评估
 
@@ -75,9 +75,10 @@ data/
 ## 开发规约
 
 ### 数据加载模式
-- 所有数据文件都使用JSON格式存储在data/目录
+- 领域数据使用JSON格式存储在data/目录；汉字笔画保留现有TXT字典，模块初始化时一次性读取为映射
 - 类使用类方法（@classmethod）加载数据
 - 数据加载在模块级别完成，避免重复读取
+- 路径相对于模块文件定位到项目data目录，不依赖启动工作目录
 
 ### 错误处理
 - 用户输入验证使用专门的验证函数
@@ -86,7 +87,7 @@ data/
 
 ### AI集成
 - 使用OpenAI API进行占卜解读
-- 需要设置OPENAI_API_KEY环境变量
+- 本地占卜不需要密钥；仅AI解读需要OPENAI_API_KEY或DEEPSEEK_API_KEY
 - 使用.env文件管理API密钥
 
 ## 常用开发命令
@@ -108,7 +109,7 @@ uv add <package_name>
 ## 注意事项
 
 ### 环境配置
-- 需要OpenAI API密钥才能使用AI解读功能
+- 本地三传先显示，选用AI且问题非空时再调用；失败不能清除本地结果
 - 使用.env文件存储敏感信息
 - 确保data/目录下的JSON文件完整
 
@@ -118,6 +119,42 @@ uv add <package_name>
 - 支持简体中文显示和输入
 
 ### 历法计算
-- 使用sxtwl库进行准确的公历农历转换
+- 使用lunar-python库进行准确的公历农历转换
 - 支持闰月计算和时辰转换
 - 八字计算基于传统历法规则
+
+## 计算与界面边界
+- `HandTechnique.predict` 返回 `Prediction(symbols, relations)`，不创建Rich表格或AI客户端。
+- CLI在`format_prediction`中渲染表格，Web直接渲染结构化结果。
+- 每次Web页面请求创建独立`DivinationWebApp`，禁止共享含UI引用的控制器。
+- `utils.validation`提供共用校验；`calendar_converter.date_to_numbers`为两种界面提供统一日期输入。
+- 八字唯一实现位于`bazi_calculator`；五行分析位于`five_elements_utils`；符号关系位于`symbol_relations`。
+- 历法按北京时间UTC+8解释输入，公历范围1900–2099；八字采用lunar-python sect 2（午夜换日），不做真太阳时校正。
+
+## 验证
+运行 `uv run python -m unittest discover -s tests -v`。改进规格见 `docs/specs/review-improvements.md`。
+
+## 算法变更的独立复核
+
+涉及算法新增、修改、替换或可能影响结果的重构时，必须由未参与实现的独立 Agent Reviewer 复核；实现者自审和现有测试不能替代。Reviewer 应独立检查参考样例、边界条件、领域约定及新旧行为差异。阻断问题修复后必须复审，复核完成前不得报告算法变更已完成。复核证据、结论和限制需写入规格或审查记录。
+
+详细流程见根目录 `AGENTS.md` 的“算法变更的独立复核”章节；此要求对 Codex 和 Claude Code 均适用。
+
+
+## Agent skills
+
+### Issue tracker
+
+使用本地 Markdown：`.scratch/<feature>/issues/`，既有spec由功能入口链接。见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+采用五个默认triage标签；执行状态在tracker文档中另行定义。见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+单上下文：根目录 `CONTEXT.md` 与 `docs/adr/` 按需创建。见 `docs/agents/domain.md`。
+
+### 开发流程
+
+按规格规划、实现、独立审查并本地提交，具体流程与命令见 `docs/agents/workflow.md`。

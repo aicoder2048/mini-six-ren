@@ -7,8 +7,10 @@ import asyncio
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.live import Live
+from rich.text import Text
 from enum import Enum
 from typing import Optional
+from utils.symbol_relations import get_relations
 
 
 class SupportedModels(Enum):
@@ -166,13 +168,11 @@ class DivinationAgent:
             ) as result:
                 console.print(f"[bold cyan]{model_name}解读结果：[/bold cyan]")
                 
-                # 使用简单的打印方式避免Live冲突
-                async for message in result.stream_text():
-                    full_response = message
-                    # 清屏并显示当前内容
-                    console.clear()
-                    console.print(f"[bold cyan]{model_name}解读结果：[/bold cyan]")
-                    console.print(self._clean_markdown(full_response))
+                # Update only the AI block; keep the local prediction visible.
+                with Live(Text(''), console=console, refresh_per_second=8) as live:
+                    async for message in result.stream_text():
+                        full_response = message
+                        live.update(Text(self._clean_markdown(full_response), style='cyan'))
                 
                 console.print("\n[bold green]解读完成！[/bold green]")
                 
@@ -253,7 +253,7 @@ class DivinationAgent:
         prompt += f"中传五行：{symbols[1].element.name}\n"
         prompt += f"末传五行：{symbols[2].element.name}\n\n"
 
-        relations = self._get_relations(symbols)
+        relations = get_relations(symbols)
         prompt += f"初传→中传：{relations[0]}（{symbols[0].element.name}{'生' if relations[0] == '生' else '克' if relations[0] == '克' else '与'}{symbols[1].element.name}）\n"
         prompt += f"中传→末传：{relations[1]}（{symbols[1].element.name}{'生' if relations[1] == '生' else '克' if relations[1] == '克' else '与'}{symbols[2].element.name}）\n\n"
 
@@ -280,24 +280,3 @@ class DivinationAgent:
         prompt += "【重要提醒】请始终围绕求问事项进行解读，将抽象的占卜符号与具体问题紧密结合，给出有针对性的指导。"
 
         return prompt
-    
-    def _is_generating(self, element1, element2):
-        """判断五行相生关系"""
-        return element1.generates == element2.name
-
-    def _is_overcoming(self, element1, element2):
-        """判断五行相克关系"""
-        return element1.overcomes == element2.name
-    
-    def _get_relations(self, symbols):
-        """获取三传之间的五行关系"""
-        relations = []
-        for i in range(2):
-            if self._is_generating(symbols[i].element, symbols[i+1].element):
-                relation = "生"
-            elif self._is_overcoming(symbols[i].element, symbols[i+1].element):
-                relation = "克"
-            else:
-                relation = "无"
-            relations.append(relation)
-        return relations
