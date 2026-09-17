@@ -65,6 +65,7 @@ class DivinationWebApp:
         self.input_summary = ''
         self.question_snapshot = ''
         self.model_select = None
+        self.optional_panel = None
         self.input_tabs = None
         self.number_inputs = []
         self.date_input = None
@@ -160,7 +161,7 @@ class DivinationWebApp:
                 self._show_error(f'计算失败：{exc}')
         finally:
             self.is_running = False
-            self.submit_button.set_text('查看三传')
+            self.submit_button.set_text('开始占卜')
             self.submit_button.enable()
 
     def _display_results(self, symbols, relations, ai_result):
@@ -221,8 +222,8 @@ class DivinationWebApp:
                     <div class="compass-inner"><span>壬</span></div>
                 </div>''')
                 ui.label('静心一刻，三传待启').classes('serif empty-title')
-                ui.label('从左侧选一种方式起课，看看事情的起点、过程与趋势。').classes('empty-copy desktop-copy')
-                ui.label('在上方选一种方式起课，看看事情的起点、过程与趋势。').classes('empty-copy mobile-copy')
+                ui.label('在左侧起一课，点「开始占卜」，看看事情的起点、过程与趋势。').classes('empty-copy desktop-copy')
+                ui.label('在上方起一课，点「开始占卜」，看看事情的起点、过程与趋势。').classes('empty-copy mobile-copy')
                 with ui.element('div').classes('stage-guide'):
                     for number, title, hint in [('一', '初传', '看见起点'), ('二', '中传', '理解过程'), ('三', '末传', '观察趋势')]:
                         with ui.column().classes('stage-guide-item'):
@@ -272,8 +273,8 @@ class DivinationWebApp:
             ui.label('从一问，到三传').classes('serif text-2xl')
             for title, copy in [
                 ('01 · 选择起课方式', '输入三个 1–999 的整数、一个北京时间，或三个汉字。三种方式任选其一。'),
-                ('02 · 留下心中所问', '问题可留空。本地模式直接呈现三传；选择可用的 AI 模型并填写问题后，才会生成解读。'),
-                ('03 · 顺着三传阅读', '初传看起点，中传看过程，末传看趋势。结合两段五行关系阅读，文化背景可按需展开。'),
+                ('02 · 点「开始占卜」', '本地立即呈现三传：初传看起点，中传看过程，末传看趋势。结合两段五行关系阅读，文化背景可按需展开。'),
+                ('03 · 心中所问（选填）', '展开「心中所问 · 解读方式」，填写问题并选择可用的 AI 模型，再次点「开始占卜」即可获得针对性解读。'),
             ]:
                 ui.label(title).classes('font-semibold mt-3')
                 ui.label(copy).classes('helper-text')
@@ -296,8 +297,9 @@ class DivinationWebApp:
                 with ui.element('section').classes('hero'):
                     with ui.column().classes('hero-copy'):
                         ui.label('观 时 · 察 势 · 明 心').classes('eyebrow')
-                        ui.label(HERO_TITLE).classes('serif hero-title').props(f'role=heading aria-level=1 data-text="{HERO_TITLE}"')
-                        ui.label('以传统智慧为镜，理清当下，从容向前。').classes('hero-description')
+                        with ui.row().classes('hero-line'):
+                            ui.label(HERO_TITLE).classes('serif hero-title').props(f'role=heading aria-level=1 data-text="{HERO_TITLE}"')
+                            ui.label('以传统智慧为镜，理清当下，从容向前。').classes('hero-description')
                     with ui.column().classes('hero-aside'):
                         ui.label('小六壬 · 项目九宫法').classes('hero-aside-title')
                         ui.label('起点 / 过程 / 趋势').classes('hero-aside-copy')
@@ -307,7 +309,6 @@ class DivinationWebApp:
                         with ui.row().classes('section-heading'):
                             ui.label('起一课').classes('serif panel-title')
                             ui.badge('三种方式 · 任选其一', color=None).classes('quiet-badge')
-                        ui.label('选一个方式，从此刻开始。').classes('helper-text')
                         with ui.tabs().classes('input-tabs').props('dense no-caps align=justify') as tabs:
                             ui.tab('numbers', label='数字', icon='pin')
                             ui.tab('date', label='时间', icon='schedule')
@@ -331,23 +332,23 @@ class DivinationWebApp:
                                 self.chinese_input = ui.input('三个汉字', placeholder='例如：天行健、中国人').classes('w-full').props('outlined hide-bottom-space')
                                 ui.label('按内置字典笔画取数，支持逗号或空格分隔。').classes('helper-text mt-3')
                         self.input_tabs = tabs
-                        ui.separator().classes('form-divider')
-                        with ui.row().classes('section-heading'):
-                            ui.label('心中所问').classes('form-section-title')
-                            ui.label('选填').classes('optional-label')
-                        self.question_input = ui.textarea('想了解的具体问题', placeholder='例如：准备换工作，接下来应先做好哪些准备？').classes('question-field w-full').props('outlined autogrow rows=3 hide-bottom-space')
-                        model_options = {'local': '仅本地计算（不使用AI）'}
-                        model_options.update({model.value: SupportedModels.get_display_name(model) for model in self.available_models})
-                        self.model_select = ui.select(model_options, label='解读方式', value=self.current_model.value if self.current_model else 'local', on_change=self._on_model_change).classes('w-full').props('outlined hide-bottom-space')
-                        if not self.available_models:
-                            with ui.row().classes('local-note'):
-                                ui.icon('check_circle_outline', size='16px')
-                                ui.label('本地即可查看完整三传，无需 AI。')
-                        else:
-                            ui.label('选择 AI 并填写问题后生成解读；问题留空则只计算三传。').classes('helper-text')
                         self.error_message = ui.label('').classes('error-message').props('role=alert')
-                        self.submit_button = ui.button('查看三传', icon='auto_awesome', on_click=self._perform_divination).classes('submit-button').props('unelevated no-caps')
-                        self.status_message = ui.label('准备就绪：填写输入后查看三传。').classes('status-message').props('role=status aria-live=polite')
+                        self.submit_button = ui.button('开始占卜', icon='auto_awesome', on_click=self._perform_divination).classes('submit-button').props('unelevated no-caps')
+                        self.status_message = ui.label('准备就绪：填写输入后开始占卜。').classes('status-message').props('role=status aria-live=polite')
+                        # 选填区：配置了 AI 时默认展开，否则收起，让主按钮留在首屏。
+                        caption = '选填 · 填写问题后可获得 AI 解读' if self.available_models else '选填 · 留空只看三传，本地无需 AI'
+                        self.optional_panel = ui.expansion('心中所问 · 解读方式', caption=caption, icon='edit_note', value=bool(self.available_models)).classes('optional-panel')
+                        with self.optional_panel:
+                            self.question_input = ui.textarea('想了解的具体问题', placeholder='例如：准备换工作，接下来应先做好哪些准备？').classes('question-field w-full').props('outlined autogrow rows=2 hide-bottom-space')
+                            model_options = {'local': '仅本地计算（不使用AI）'}
+                            model_options.update({model.value: SupportedModels.get_display_name(model) for model in self.available_models})
+                            self.model_select = ui.select(model_options, label='解读方式', value=self.current_model.value if self.current_model else 'local', on_change=self._on_model_change).classes('w-full').props('outlined hide-bottom-space')
+                            if not self.available_models:
+                                with ui.row().classes('local-note'):
+                                    ui.icon('check_circle_outline', size='16px')
+                                    ui.label('本地即可查看完整三传，无需 AI。')
+                            else:
+                                ui.label('选择 AI 并填写问题后生成解读；问题留空则只计算三传。').classes('helper-text')
 
                     with ui.element('section').classes('reading-panel').props('aria-label=三传结果'):
                         with ui.row().classes('reading-heading'):

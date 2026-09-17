@@ -280,6 +280,21 @@ class WebRegressions(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(app.is_running)
                 self.assertTrue(app.submit_button.enabled)
 
+    async def test_optional_panel_follows_ai_availability_and_button_names_the_action(self):
+        from nicegui import Client, ui
+        from ai_agent import SupportedModels
+        from web import create_page
+        for models, expanded in [([], False), ([SupportedModels.OPENAI_GPT56], True)]:
+            with self.subTest(models=models), patch('web.DivinationAgent.get_available_models', return_value=models):
+                with Client(ui.page(f'/optional-{expanded}'), request=None):
+                    app = create_page()
+                    self.assertEqual(app.optional_panel.value, expanded)
+                    self.assertEqual(app.submit_button.text, '开始占卜')
+                    self.assertIs(app.question_input.parent_slot.parent, app.optional_panel)
+                    self.assertIs(app.model_select.parent_slot.parent, app.optional_panel)
+                    siblings = app.submit_button.parent_slot.children
+                    self.assertLess(siblings.index(app.submit_button), siblings.index(app.optional_panel))
+
     async def test_blank_question_and_local_selection_skip_ai(self):
         from nicegui import Client, ui
         from ai_agent import SupportedModels

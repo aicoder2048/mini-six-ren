@@ -4,7 +4,7 @@ html[data-theme="neon"] body { --q-primary: #22e3ff !important; --q-secondary: #
 html[data-theme="neon"] .q-page { background: transparent; }
 html[data-theme="neon"] body::after { content: ''; position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .24) 0 1px, transparent 1px 3px); box-shadow: inset 0 0 180px rgba(0, 0, 0, .65); }
 html[data-theme="neon"] ::selection { background: var(--magenta); color: #07070d; }
-html[data-theme="neon"] .eyebrow, html[data-theme="neon"] .brand-english, html[data-theme="neon"] .stage-number, html[data-theme="neon"] .status-message, html[data-theme="neon"] .quiet-badge, html[data-theme="neon"] .mode-badge, html[data-theme="neon"] .element-badge, html[data-theme="neon"] .header-tagline, html[data-theme="neon"] .hero-aside, html[data-theme="neon"] .site-footer, html[data-theme="neon"] .q-tab__label, html[data-theme="neon"] .q-field__label, html[data-theme="neon"] .input-snapshot, html[data-theme="neon"] .theme-swatch, html[data-theme="neon"] .reading-heading, html[data-theme="neon"] .optional-label, html[data-theme="neon"] .relation-title, html[data-theme="neon"] .submit-button { font-family: var(--mono); }
+html[data-theme="neon"] .eyebrow, html[data-theme="neon"] .brand-english, html[data-theme="neon"] .stage-number, html[data-theme="neon"] .status-message, html[data-theme="neon"] .quiet-badge, html[data-theme="neon"] .mode-badge, html[data-theme="neon"] .element-badge, html[data-theme="neon"] .header-tagline, html[data-theme="neon"] .hero-aside, html[data-theme="neon"] .site-footer, html[data-theme="neon"] .q-tab__label, html[data-theme="neon"] .q-field__label, html[data-theme="neon"] .input-snapshot, html[data-theme="neon"] .theme-swatch, html[data-theme="neon"] .reading-heading, html[data-theme="neon"] .relation-title, html[data-theme="neon"] .submit-button { font-family: var(--mono); }
 /* 头部 */
 html[data-theme="neon"] .site-header { border-bottom-color: var(--line); }
 html[data-theme="neon"] .brand-seal { background: transparent; color: var(--magenta); border: 1px solid var(--magenta); border-radius: 2px; outline: 0; box-shadow: 0 0 14px rgba(255, 62, 165, .5), inset 0 0 10px rgba(255, 62, 165, .25); text-shadow: 0 0 8px rgba(255, 62, 165, .9); }
@@ -43,7 +43,9 @@ html[data-theme="neon"] .form-card .q-field--outlined .q-field__control:hover:be
 html[data-theme="neon"] .form-card .q-field--focused .q-field__control { box-shadow: 0 0 0 1px var(--accent), 0 0 18px rgba(34, 227, 255, .35); }
 html[data-theme="neon"] .form-card .q-field__label, html[data-theme="neon"] .form-card .q-field__native::placeholder, html[data-theme="neon"] .q-field__append, html[data-theme="neon"] .q-field__prepend { color: var(--muted); }
 html[data-theme="neon"] .form-card .q-field__native { color: #fff; }
-html[data-theme="neon"] .form-divider { background: var(--line); }
+html[data-theme="neon"] .optional-panel { border-color: var(--line); border-radius: 2px; background: rgba(7, 7, 13, .6); }
+html[data-theme="neon"] .optional-panel .q-item__label { color: #fff; }
+html[data-theme="neon"] .optional-panel .q-item__label--caption { color: var(--muted); }
 html[data-theme="neon"] .local-note { color: var(--el-wood); }
 html[data-theme="neon"] .error-message { color: #ff5c7a; text-shadow: 0 0 8px rgba(255, 92, 122, .5); }
 html[data-theme="neon"] .submit-button { background: transparent !important; color: var(--accent) !important; border: 1px solid var(--accent); border-radius: 2px; box-shadow: 0 0 12px rgba(34, 227, 255, .35), inset 0 0 12px rgba(34, 227, 255, .12); transition: background-color .25s ease, color .25s ease, box-shadow .25s ease; }
