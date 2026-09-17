@@ -1,0 +1,74 @@
+/* 星夜 · 深空星图 · 鎏金流光。只在 html[data-theme="night"] 下生效；星空画布与指针光晕由 theme.js 启停。 */
+html[data-theme="night"] { --paper: #0b1020; --ink: #ece7d9; --muted: #a6a9bc; --line: rgba(224, 183, 85, .2); --accent: #e0b755; --gold-soft: #f1d48a; --gold-deep: #b8862b; --surface: rgba(19, 26, 52, .68); --surface-solid: #151c3a; --surface-2: rgba(255, 255, 255, .045); --el-wood: #8fe0ad; --el-fire: #ff9a76; --el-earth: #e2c07a; --el-metal: #dfe6ef; --el-water: #86bfff; color-scheme: dark; }
+html[data-theme="night"] body { --q-primary: #e0b755 !important; --q-secondary: #8fa3c9 !important; --q-negative: #ff8a7a !important; background: radial-gradient(1200px 700px at 72% -12%, #1c2556 0%, transparent 60%), radial-gradient(900px 620px at -8% 104%, #23163f 0%, transparent 62%), #0b1020; background-attachment: fixed; }
+html[data-theme="night"] .q-page { background: transparent; }
+html[data-theme="night"] #msr-stars { position: fixed; inset: 0; z-index: -2; pointer-events: none; }
+html[data-theme="night"] body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(520px circle at var(--msr-mx, 60%) var(--msr-my, 20%), rgba(224, 183, 85, .13), transparent 62%); transition: background-position .2s; }
+/* 头部与主视觉 */
+html[data-theme="night"] .brand-seal { background: linear-gradient(160deg, var(--gold-soft), var(--gold-deep)); color: #1a1408; outline-color: #ffffff55; box-shadow: 0 0 26px rgba(224, 183, 85, .35); }
+html[data-theme="night"] .header-tagline, html[data-theme="night"] .brand-english { color: var(--muted); }
+html[data-theme="night"] .guide-button, html[data-theme="night"] .wisdom-button { color: var(--gold-soft) !important; }
+html[data-theme="night"] .theme-switcher { background: var(--surface-2); border-color: var(--line); }
+html[data-theme="night"] .theme-swatch:hover, html[data-theme="night"] .theme-swatch[aria-pressed="true"], html[data-theme="night"] .theme-swatch[data-theme-id="night"] { background: rgba(224, 183, 85, .16); color: var(--gold-soft); box-shadow: inset 0 0 0 1px rgba(224, 183, 85, .4); }
+html[data-theme="night"] .eyebrow { color: var(--gold-soft); text-shadow: 0 0 14px rgba(224, 183, 85, .5); }
+html[data-theme="night"] .hero-title { background: linear-gradient(120deg, #fff2c8 0%, var(--accent) 48%, var(--gold-deep) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+html[data-theme="night"] .hero-description { color: var(--muted); }
+html[data-theme="night"] .hero-aside { border-left-color: var(--line); }
+html[data-theme="night"] .hero-aside-title { color: var(--gold-soft); }
+/* 玻璃卡片 */
+html[data-theme="night"] .form-card, html[data-theme="night"] .reading-panel, html[data-theme="night"] .ai-card, html[data-theme="night"] .guide-dialog { background: var(--surface); border-color: var(--line); box-shadow: 0 24px 60px rgba(0, 0, 0, .38); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+html[data-theme="night"] .quiet-badge, html[data-theme="night"] .mode-badge, html[data-theme="night"] .element-badge { background: rgba(224, 183, 85, .12); color: var(--gold-soft); box-shadow: inset 0 0 0 1px rgba(224, 183, 85, .3); }
+html[data-theme="night"] .helper-text, html[data-theme="night"] .reading-heading, html[data-theme="night"] .stage-number, html[data-theme="night"] .symbol-interpretation, html[data-theme="night"] .empty-note, html[data-theme="night"] .site-footer, html[data-theme="night"] .guide-footnote { color: var(--muted); }
+html[data-theme="night"] .reading-heading-title, html[data-theme="night"] .empty-title, html[data-theme="night"] .guide-title, html[data-theme="night"] .stage-label, html[data-theme="night"] .culture-title { color: var(--ink); }
+html[data-theme="night"] .guide-number { color: var(--gold-soft); }
+html[data-theme="night"] .input-tabs { background: var(--surface-2); border-color: var(--line); }
+html[data-theme="night"] .input-tabs .q-tab { color: var(--muted); }
+html[data-theme="night"] .input-tabs .q-tab--active { background: rgba(224, 183, 85, .16); color: var(--gold-soft); box-shadow: none; }
+html[data-theme="night"] .form-card .q-field__control { background: var(--surface-2); }
+html[data-theme="night"] .form-card .q-field--outlined .q-field__control:before { border-color: rgba(236, 231, 217, .2); }
+html[data-theme="night"] .form-card .q-field--outlined .q-field__control:hover:before { border-color: rgba(224, 183, 85, .55); }
+html[data-theme="night"] .form-card .q-field__label, html[data-theme="night"] .form-card .q-field__native::placeholder, html[data-theme="night"] .q-field__append, html[data-theme="night"] .q-field__prepend { color: var(--muted); }
+html[data-theme="night"] .local-note { color: #9fc9a3; }
+html[data-theme="night"] .error-message { color: #ff8a7a; }
+html[data-theme="night"] .submit-button { color: #1a1408 !important; background: linear-gradient(135deg, var(--gold-soft), #d4a843) !important; box-shadow: 0 12px 32px rgba(224, 183, 85, .25); }
+html[data-theme="night"] .submit-button:hover { box-shadow: 0 14px 40px rgba(224, 183, 85, .4); }
+html[data-theme="night"] .guide-dialog .q-btn--unelevated { color: #1a1408 !important; background: linear-gradient(135deg, var(--gold-soft), #d4a843) !important; }
+html[data-theme="night"] .input-snapshot { background: var(--surface-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+/* 星盘空状态：外环缓缓转动，中心印章微光 */
+html[data-theme="night"] .compass { border-color: rgba(224, 183, 85, .35); background: none; box-shadow: inset 0 0 0 11px #111938, inset 0 0 0 12px rgba(224, 183, 85, .3), inset 0 0 0 39px #111938, 0 0 60px rgba(224, 183, 85, .12); }
+html[data-theme="night"] .compass::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: repeating-conic-gradient(from 0deg, rgba(224, 183, 85, .32) 0deg 1deg, transparent 1deg 15deg); animation: night-spin 90s linear infinite; }
+html[data-theme="night"] .compass > span { color: var(--gold-soft); background: #111938; }
+html[data-theme="night"] .compass-inner { border-color: rgba(224, 183, 85, .5); background: #0d1430; box-shadow: 0 0 30px rgba(224, 183, 85, .18); }
+html[data-theme="night"] .compass-inner span { color: var(--gold-soft); text-shadow: 0 0 18px rgba(224, 183, 85, .65); }
+html[data-theme="night"] .stage-guide-item + .stage-guide-item { border-left-color: var(--line); }
+/* 三传卡片：交错浮现、五行分色、悬停悬浮 */
+html[data-theme="night"] .transmission-card { background: rgba(255, 255, 255, .04); border-color: var(--line); border-top-color: var(--accent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05); animation: night-rise .7s cubic-bezier(.2, .7, .2, 1) backwards; transition: transform .35s ease, box-shadow .35s ease; }
+html[data-theme="night"] .transmission-card:nth-child(2) { animation-delay: .12s; }
+html[data-theme="night"] .transmission-card:nth-child(3) { animation-delay: .24s; }
+html[data-theme="night"] .transmission-card:hover { transform: translateY(-4px); box-shadow: 0 24px 48px rgba(0, 0, 0, .45), 0 0 40px rgba(224, 183, 85, .1); }
+html[data-theme="night"] .transmission-card[data-element="wood"] { border-top-color: var(--el-wood); }
+html[data-theme="night"] .transmission-card[data-element="fire"] { border-top-color: var(--el-fire); }
+html[data-theme="night"] .transmission-card[data-element="earth"] { border-top-color: var(--el-earth); }
+html[data-theme="night"] .transmission-card[data-element="metal"] { border-top-color: var(--el-metal); }
+html[data-theme="night"] .transmission-card[data-element="water"] { border-top-color: var(--el-water); }
+html[data-theme="night"] .symbol-name { color: var(--gold-soft); text-shadow: 0 0 22px rgba(224, 183, 85, .35); }
+html[data-theme="night"] .element-badge.element-wood { color: var(--el-wood); background: rgba(143, 224, 173, .12); box-shadow: inset 0 0 0 1px rgba(143, 224, 173, .35); }
+html[data-theme="night"] .element-badge.element-fire { color: var(--el-fire); background: rgba(255, 154, 118, .12); box-shadow: inset 0 0 0 1px rgba(255, 154, 118, .35); }
+html[data-theme="night"] .element-badge.element-earth { color: var(--el-earth); background: rgba(226, 192, 122, .12); box-shadow: inset 0 0 0 1px rgba(226, 192, 122, .35); }
+html[data-theme="night"] .element-badge.element-metal { color: var(--el-metal); background: rgba(223, 230, 239, .1); box-shadow: inset 0 0 0 1px rgba(223, 230, 239, .35); }
+html[data-theme="night"] .element-badge.element-water { color: var(--el-water); background: rgba(134, 191, 255, .12); box-shadow: inset 0 0 0 1px rgba(134, 191, 255, .35); }
+html[data-theme="night"] .relation-title { color: var(--gold-soft); }
+html[data-theme="night"] .culture-panel { border-color: var(--line); }
+html[data-theme="night"] .optional-panel { border-color: var(--line); background: var(--surface-2); }
+html[data-theme="night"] .optional-panel .q-item__label { color: var(--ink); }
+html[data-theme="night"] .optional-panel .q-item__label--caption { color: var(--muted); }
+html[data-theme="night"] .ai-interpretation strong { color: var(--gold-soft); }
+html[data-theme="night"] .wisdom-strip { background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+html[data-theme="night"] .wisdom-mark { color: var(--gold-soft); border-right-color: var(--line); }
+html[data-theme="night"] .guide-footnote { background: var(--surface-2); }
+/* Quasar 弹层 */
+html[data-theme="night"] .q-menu { background: var(--surface-solid); color: var(--ink); border: 1px solid var(--line); }
+html[data-theme="night"] .q-dialog__backdrop { background: rgba(3, 6, 20, .72); }
+html[data-theme="night"] .q-expansion-item .q-item { color: var(--ink); }
+@keyframes night-spin { to { transform: rotate(360deg); } }
+@keyframes night-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }

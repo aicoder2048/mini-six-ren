@@ -2,10 +2,13 @@
 """小六壬占卜 Web Interface，使用 NiceGUI 展示本地三传和可选AI解读。"""
 
 import os
+import re
 import sys
+import json
 import asyncio
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Optional
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -20,6 +23,36 @@ from utils.calendar_converter import date_to_numbers
 from utils.validation import validate_numbers, validate_chinese
 from utils.symbol_relations import describe_relation
 
+THEME_DIR = Path(__file__).with_name('themes')
+HERO_TITLE = '一念起，观三传。'
+# 五行→CSS 钩子；默认皮肤不使用这些类，仅供主题分色。
+ELEMENT_KEYS = {'木': 'wood', '火': 'fire', '土': 'earth', '金': 'metal', '水': 'water'}
+
+
+@dataclass(frozen=True)
+class Theme:
+    id: str
+    label: str
+    description: str
+    stylesheet: Optional[str]  # 相对 THEME_DIR；None 表示只用 web.css 的默认皮肤
+
+    def __post_init__(self):
+        # id 会不加引号地写入 HTML 属性与 CSS 选择器，文案会写入带引号的属性，导入时即拒绝不安全的值。
+        if not re.fullmatch(r'[a-z][a-z0-9-]*', self.id):
+            raise ValueError(f'主题 id 只能由小写字母、数字和连字符组成：{self.id!r}')
+        if '"' in self.label or '"' in self.description:
+            raise ValueError(f'主题文案不能包含双引号：{self.id}')
+
+
+# 首项为默认皮肤；切换、记忆与效果启停全部在浏览器端完成，见 themes/theme.js。
+THEMES = (
+    Theme('paper', '素纸', '暖白纸感 · 朱砂主色', None),
+    Theme('night', '星夜', '深空星图 · 鎏金流光', 'night.css'),
+    Theme('ink', '水墨', '宣纸留白 · 朱文印章', 'ink.css'),
+    Theme('neon', '霓虹', '赛博终端 · 荧光扫描', 'neon.css'),
+)
+DEFAULT_THEME = THEMES[0]
+
 
 class DivinationWebApp:
     def __init__(self):
@@ -32,6 +65,7 @@ class DivinationWebApp:
         self.input_summary = ''
         self.question_snapshot = ''
         self.model_select = None
+        self.optional_panel = None
         self.input_tabs = None
         self.number_inputs = []
         self.date_input = None
@@ -127,7 +161,7 @@ class DivinationWebApp:
                 self._show_error(f'计算失败：{exc}')
         finally:
             self.is_running = False
-            self.submit_button.set_text('查看三传')
+            self.submit_button.set_text('开始占卜')
             self.submit_button.enable()
 
     def _display_results(self, symbols, relations, ai_result):
@@ -146,13 +180,14 @@ class DivinationWebApp:
             ui.label('项目九宫法 · 三传表示观察阶段，不对应确定期限。').classes('helper-text')
             with ui.element('div').classes('transmission-grid'):
                 for i, (symbol, (stage, hint)) in enumerate(zip(symbols, stages)):
-                    with ui.card().classes('transmission-card'):
+                    element_key = ELEMENT_KEYS.get(symbol.element.name, 'unknown')
+                    with ui.card().classes('transmission-card').props(f'data-element={element_key}'):
                         with ui.row().classes('section-heading'):
                             ui.label(stage).classes('stage-label')
                             ui.label(f'0{i + 1}').classes('stage-number')
                         ui.label(hint).classes('helper-text')
                         ui.label(symbol.name).classes('serif symbol-name')
-                        ui.badge(f'五行 · {symbol.element.name}', color=None).classes('element-badge')
+                        ui.badge(f'五行 · {symbol.element.name}', color=None).classes(f'element-badge element-{element_key}')
                         ui.label(symbol.description).classes('symbol-description')
                         ui.label(symbol.interpretation).classes('symbol-interpretation')
                         if i < 2:
@@ -187,8 +222,8 @@ class DivinationWebApp:
                     <div class="compass-inner"><span>壬</span></div>
                 </div>''')
                 ui.label('静心一刻，三传待启').classes('serif empty-title')
-                ui.label('从左侧选一种方式起课，看看事情的起点、过程与趋势。').classes('empty-copy desktop-copy')
-                ui.label('在上方选一种方式起课，看看事情的起点、过程与趋势。').classes('empty-copy mobile-copy')
+                ui.label('在左侧起一课，点「开始占卜」，看看事情的起点、过程与趋势。').classes('empty-copy desktop-copy')
+                ui.label('在上方起一课，点「开始占卜」，看看事情的起点、过程与趋势。').classes('empty-copy mobile-copy')
                 with ui.element('div').classes('stage-guide'):
                     for number, title, hint in [('一', '初传', '看见起点'), ('二', '中传', '理解过程'), ('三', '末传', '观察趋势')]:
                         with ui.column().classes('stage-guide-item'):
@@ -206,16 +241,40 @@ class DivinationWebApp:
     def _on_model_change(self, e: ValueChangeEventArguments):
         self.current_model = next((model for model in self.available_models if model.value == e.value), None)
 
+    @staticmethod
+    def _add_theme_assets():
+        """web.css 之后注入主题脚本与各主题样式；脚本在首屏绘制前读取已保存的皮肤。"""
+        ids = json.dumps([theme.id for theme in THEMES], ensure_ascii=False)
+        ui.add_head_html(f'<script>window.MSR_THEME_IDS={ids};window.MSR_THEME_DEFAULT={json.dumps(DEFAULT_THEME.id)};</script>')
+        ui.add_head_html(f'<script>{(THEME_DIR / "theme.js").read_text(encoding="utf-8")}</script>')
+        for theme in THEMES:
+            if theme.stylesheet:
+                ui.add_css(THEME_DIR / theme.stylesheet)
+
+    @staticmethod
+    def _create_theme_switcher():
+        """纯客户端切换：点击只调用 window.msrTheme.apply，不经服务器。"""
+        with ui.element('div').classes('theme-switcher').props('role=group aria-label="切换皮肤"'):
+            for theme in THEMES:
+                pressed = 'true' if theme is DEFAULT_THEME else 'false'
+                button = ui.element('button').classes('theme-swatch').props(
+                    f'type=button data-theme-id={theme.id} aria-pressed={pressed} aria-label="{theme.label}" title="{theme.label} · {theme.description}"')
+                button.on('click', js_handler=f'() => window.msrTheme && window.msrTheme.apply({json.dumps(theme.id)})')
+                with button:
+                    ui.element('span').classes('swatch-dot').props('aria-hidden=true')
+                    ui.html(theme.label, tag='span').classes('swatch-label')
+
     def create_ui(self):
         now = datetime.now(timezone(timedelta(hours=8)))
         ui.colors(primary='#a34432', secondary='#69755e', negative='#b33c32')
         ui.add_css(Path(__file__).with_name('web.css'))
+        self._add_theme_assets()
         with ui.dialog() as guide, ui.card().classes('guide-dialog'):
             ui.label('从一问，到三传').classes('serif text-2xl')
             for title, copy in [
                 ('01 · 选择起课方式', '输入三个 1–999 的整数、一个北京时间，或三个汉字。三种方式任选其一。'),
-                ('02 · 留下心中所问', '问题可留空。本地模式直接呈现三传；选择可用的 AI 模型并填写问题后，才会生成解读。'),
-                ('03 · 顺着三传阅读', '初传看起点，中传看过程，末传看趋势。结合两段五行关系阅读，文化背景可按需展开。'),
+                ('02 · 点「开始占卜」', '本地立即呈现三传：初传看起点，中传看过程，末传看趋势。结合两段五行关系阅读，文化背景可按需展开。'),
+                ('03 · 心中所问（选填）', '展开「心中所问 · 解读方式」，填写问题并选择可用的 AI 模型，再次点「开始占卜」即可获得针对性解读。'),
             ]:
                 ui.label(title).classes('font-semibold mt-3')
                 ui.label(copy).classes('helper-text')
@@ -231,14 +290,16 @@ class DivinationWebApp:
                         ui.label('MINI SIX REN').classes('brand-english')
                 with ui.row().classes('header-actions'):
                     ui.label('传统智慧 · 当下启发').classes('header-tagline')
+                    self._create_theme_switcher()
                     ui.button('使用指南', icon='help_outline', on_click=guide.open).props('flat no-caps').classes('guide-button')
 
             with ui.element('main').classes('page-main'):
                 with ui.element('section').classes('hero'):
                     with ui.column().classes('hero-copy'):
                         ui.label('观 时 · 察 势 · 明 心').classes('eyebrow')
-                        ui.label('一念起，观三传。').classes('serif hero-title').props('role=heading aria-level=1')
-                        ui.label('以传统智慧为镜，理清当下，从容向前。').classes('hero-description')
+                        with ui.row().classes('hero-line'):
+                            ui.label(HERO_TITLE).classes('serif hero-title').props(f'role=heading aria-level=1 data-text="{HERO_TITLE}"')
+                            ui.label('以传统智慧为镜，理清当下，从容向前。').classes('hero-description')
                     with ui.column().classes('hero-aside'):
                         ui.label('小六壬 · 项目九宫法').classes('hero-aside-title')
                         ui.label('起点 / 过程 / 趋势').classes('hero-aside-copy')
@@ -248,7 +309,6 @@ class DivinationWebApp:
                         with ui.row().classes('section-heading'):
                             ui.label('起一课').classes('serif panel-title')
                             ui.badge('三种方式 · 任选其一', color=None).classes('quiet-badge')
-                        ui.label('选一个方式，从此刻开始。').classes('helper-text')
                         with ui.tabs().classes('input-tabs').props('dense no-caps align=justify') as tabs:
                             ui.tab('numbers', label='数字', icon='pin')
                             ui.tab('date', label='时间', icon='schedule')
@@ -272,23 +332,23 @@ class DivinationWebApp:
                                 self.chinese_input = ui.input('三个汉字', placeholder='例如：天行健、中国人').classes('w-full').props('outlined hide-bottom-space')
                                 ui.label('按内置字典笔画取数，支持逗号或空格分隔。').classes('helper-text mt-3')
                         self.input_tabs = tabs
-                        ui.separator().classes('form-divider')
-                        with ui.row().classes('section-heading'):
-                            ui.label('心中所问').classes('form-section-title')
-                            ui.label('选填').classes('optional-label')
-                        self.question_input = ui.textarea('想了解的具体问题', placeholder='例如：准备换工作，接下来应先做好哪些准备？').classes('question-field w-full').props('outlined autogrow rows=3 hide-bottom-space')
-                        model_options = {'local': '仅本地计算（不使用AI）'}
-                        model_options.update({model.value: SupportedModels.get_display_name(model) for model in self.available_models})
-                        self.model_select = ui.select(model_options, label='解读方式', value=self.current_model.value if self.current_model else 'local', on_change=self._on_model_change).classes('w-full').props('outlined hide-bottom-space')
-                        if not self.available_models:
-                            with ui.row().classes('local-note'):
-                                ui.icon('check_circle_outline', size='16px')
-                                ui.label('本地即可查看完整三传，无需 AI。')
-                        else:
-                            ui.label('选择 AI 并填写问题后生成解读；问题留空则只计算三传。').classes('helper-text')
                         self.error_message = ui.label('').classes('error-message').props('role=alert')
-                        self.submit_button = ui.button('查看三传', icon='auto_awesome', on_click=self._perform_divination).classes('submit-button').props('unelevated no-caps')
-                        self.status_message = ui.label('准备就绪：填写输入后查看三传。').classes('status-message').props('role=status aria-live=polite')
+                        self.submit_button = ui.button('开始占卜', icon='auto_awesome', on_click=self._perform_divination).classes('submit-button').props('unelevated no-caps')
+                        self.status_message = ui.label('准备就绪：填写输入后开始占卜。').classes('status-message').props('role=status aria-live=polite')
+                        # 选填区：配置了 AI 时默认展开，否则收起，让主按钮留在首屏。
+                        caption = '选填 · 填写问题后可获得 AI 解读' if self.available_models else '选填 · 留空只看三传，本地无需 AI'
+                        self.optional_panel = ui.expansion('心中所问 · 解读方式', caption=caption, icon='edit_note', value=bool(self.available_models)).classes('optional-panel')
+                        with self.optional_panel:
+                            self.question_input = ui.textarea('想了解的具体问题', placeholder='例如：准备换工作，接下来应先做好哪些准备？').classes('question-field w-full').props('outlined autogrow rows=2 hide-bottom-space')
+                            model_options = {'local': '仅本地计算（不使用AI）'}
+                            model_options.update({model.value: SupportedModels.get_display_name(model) for model in self.available_models})
+                            self.model_select = ui.select(model_options, label='解读方式', value=self.current_model.value if self.current_model else 'local', on_change=self._on_model_change).classes('w-full').props('outlined hide-bottom-space')
+                            if not self.available_models:
+                                with ui.row().classes('local-note'):
+                                    ui.icon('check_circle_outline', size='16px')
+                                    ui.label('本地即可查看完整三传，无需 AI。')
+                            else:
+                                ui.label('选择 AI 并填写问题后生成解读；问题留空则只计算三传。').classes('helper-text')
 
                     with ui.element('section').classes('reading-panel').props('aria-label=三传结果'):
                         with ui.row().classes('reading-heading'):

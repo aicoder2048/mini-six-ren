@@ -127,7 +127,7 @@ class WebExperienceContracts(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(any('8、5、7' in text for text in labels))
                 self.assertTrue(any('2026-09-15 12:00' in text for text in labels))
                 self.assertIn('本地三传已完成', app.status_message.text)
-                self.assertEqual(app.submit_button.text, '查看三传')
+                self.assertEqual(app.submit_button.text, '开始占卜')
                 app.date_input.value = '2026-09-16'
                 self.assertIn('2026-09-15', app.input_summary)
                 app.input_tabs.value = 'numbers'
