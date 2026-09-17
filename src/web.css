@@ -12,13 +12,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft
 .serif { font-family: var(--serif); }
 .app-shell { width: 100%; gap: 0; }
 .site-header, .page-main, .site-footer { width: min(1280px, calc(100% - 96px)); margin: 0 auto; }
-.site-header { display: flex; align-items: center; justify-content: space-between; min-height: 104px; border-bottom: 1px solid var(--line); gap: 20px; }
-.brand { align-items: center; gap: 13px; }
+.site-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; min-height: 104px; border-bottom: 1px solid var(--line); gap: 20px; }
+.brand { flex-wrap: nowrap; align-items: center; gap: 13px; }
 .brand-seal { display: grid; place-items: center; width: 43px; height: 47px; background: var(--accent); color: #fff9ee; font-size: 29px; border-radius: 3px; outline: 1px solid #ffffff65; outline-offset: -5px; }
 .brand-wordmark { gap: 3px; }
 .brand-name { font-size: 25px; font-weight: 600; letter-spacing: 5px; line-height: 1.3; }
 .brand-english { font-size: 9px; letter-spacing: 2.5px; color: var(--muted); }
-.header-actions { align-items: center; gap: 28px; }
+.header-actions { flex-wrap: nowrap; align-items: center; gap: 28px; margin-left: auto; }
 .header-tagline { color: var(--muted); font-size: 12px; letter-spacing: 2px; }
 .guide-button { color: #5d5c53 !important; font-size: 13px; }
 .hero { display: flex; justify-content: space-between; align-items: center; padding: 48px 0 38px; gap: 24px; }
@@ -124,6 +124,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft
 .guide-dialog { max-width: 480px !important; padding: 30px; border-radius: 12px; background: #fffefa; color: var(--ink); }
 .guide-footnote { padding: 14px; background: #f4f1e9; font-size: 12px; color: #746c5d; line-height: 1.8; margin: 12px 0; }
 .q-btn:focus-visible, .q-item:focus-visible, .q-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.theme-switcher { display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: #fffefa; }
+.theme-swatch { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 4px 9px 4px 5px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; letter-spacing: 1px; line-height: 1; cursor: pointer; transition: background-color .2s, color .2s; }
+.theme-swatch:hover { background: #f1efe8; color: var(--ink); }
+.theme-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-swatch[aria-pressed="true"], html[data-theme="paper"] .theme-swatch[data-theme-id="paper"], html[data-theme="night"] .theme-swatch[data-theme-id="night"], html[data-theme="ink"] .theme-swatch[data-theme-id="ink"], html[data-theme="neon"] .theme-swatch[data-theme-id="neon"] { background: #f1efe8; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.swatch-dot { flex: none; width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1px #00000018; }
+.theme-swatch[data-theme-id="paper"] .swatch-dot { background: linear-gradient(135deg, #f7f5f0 50%, #a34432 50%); }
+.theme-swatch[data-theme-id="night"] .swatch-dot { background: linear-gradient(135deg, #0b1020 50%, #e0b755 50%); }
+.theme-swatch[data-theme-id="ink"] .swatch-dot { background: linear-gradient(135deg, #f9f8f4 50%, #161616 50%); }
+.theme-swatch[data-theme-id="neon"] .swatch-dot { background: linear-gradient(135deg, #07070d 50%, #22e3ff 50%); }
+.swatch-label { white-space: nowrap; }
+html.msr-theme-fade body, html.msr-theme-fade body *, html.msr-theme-fade body *::before, html.msr-theme-fade body *::after { transition: background-color .45s ease, color .45s ease, border-color .45s ease, box-shadow .45s ease !important; }
 @media (max-width: 1199px) and (min-width: 901px) {
     .site-header, .page-main, .site-footer { width: calc(100% - 64px); }
     .workspace { grid-template-columns: 350px minmax(0, 1fr); gap: 20px; }
@@ -135,6 +147,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft
     .site-header { min-height: 88px; }
     .hero { padding: 32px 0; }
     .hero-aside, .header-tagline { display: none; }
+    .header-actions { gap: 12px; }
     .workspace { grid-template-columns: minmax(0, 1fr); gap: 22px; }
     .form-card { padding: 24px; }
     .date-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -151,6 +164,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft
     .brand-seal { width: 36px; height: 41px; font-size: 25px; }
     .brand-english { font-size: 8px; letter-spacing: 2px; }
     .guide-button { padding: 4px; font-size: 12px; }
+    .site-header { gap: 12px; }
+    .theme-switcher { gap: 0; padding: 2px; }
+    .theme-swatch { padding: 3px; }
+    .swatch-dot { width: 14px; height: 14px; }
+    .swatch-label { display: none; }
     .hero-title { font-size: 34px; letter-spacing: 1px; }
     .hero-description { font-size: 12px; letter-spacing: 0; }
     .form-card { padding: 22px 18px; }
@@ -168,5 +186,5 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft
     .site-footer { flex-direction: column; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }

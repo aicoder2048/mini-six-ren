@@ -1,0 +1,101 @@
+/* 霓虹 · 赛博终端 · 荧光扫描。只在 html[data-theme="neon"] 下生效；全部为 CSS，无脚本效果。 */
+html[data-theme="neon"] { --paper: #07070d; --ink: #d9f6ff; --muted: #7fa3b3; --line: rgba(34, 227, 255, .28); --accent: #22e3ff; --magenta: #ff3ea5; --surface: rgba(10, 14, 28, .84); --surface-2: rgba(34, 227, 255, .06); --mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'Courier New', monospace; --el-wood: #7cff9a; --el-fire: #ff6b6b; --el-earth: #ffd166; --el-metal: #e8f4ff; --el-water: #4cc9ff; color-scheme: dark; }
+html[data-theme="neon"] body { --q-primary: #22e3ff !important; --q-secondary: #ff3ea5 !important; --q-negative: #ff5c7a !important; background: linear-gradient(rgba(34, 227, 255, .05) 1px, transparent 1px) 0 0 / 100% 36px, linear-gradient(90deg, rgba(34, 227, 255, .05) 1px, transparent 1px) 0 0 / 36px 100%, radial-gradient(900px 520px at 50% -12%, rgba(255, 62, 165, .18), transparent 60%), #07070d; animation: neon-crt .8s cubic-bezier(.2, .8, .2, 1) 1; }
+html[data-theme="neon"] .q-page { background: transparent; }
+html[data-theme="neon"] body::after { content: ''; position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .24) 0 1px, transparent 1px 3px); box-shadow: inset 0 0 180px rgba(0, 0, 0, .65); }
+html[data-theme="neon"] ::selection { background: var(--magenta); color: #07070d; }
+html[data-theme="neon"] .eyebrow, html[data-theme="neon"] .brand-english, html[data-theme="neon"] .stage-number, html[data-theme="neon"] .status-message, html[data-theme="neon"] .quiet-badge, html[data-theme="neon"] .mode-badge, html[data-theme="neon"] .element-badge, html[data-theme="neon"] .header-tagline, html[data-theme="neon"] .hero-aside, html[data-theme="neon"] .site-footer, html[data-theme="neon"] .q-tab__label, html[data-theme="neon"] .q-field__label, html[data-theme="neon"] .input-snapshot, html[data-theme="neon"] .theme-swatch, html[data-theme="neon"] .reading-heading, html[data-theme="neon"] .optional-label, html[data-theme="neon"] .relation-title, html[data-theme="neon"] .submit-button { font-family: var(--mono); }
+/* 头部 */
+html[data-theme="neon"] .site-header { border-bottom-color: var(--line); }
+html[data-theme="neon"] .brand-seal { background: transparent; color: var(--magenta); border: 1px solid var(--magenta); border-radius: 2px; outline: 0; box-shadow: 0 0 14px rgba(255, 62, 165, .5), inset 0 0 10px rgba(255, 62, 165, .25); text-shadow: 0 0 8px rgba(255, 62, 165, .9); }
+html[data-theme="neon"] .brand-name { color: #fff; text-shadow: 0 0 10px rgba(34, 227, 255, .7); }
+html[data-theme="neon"] .guide-button, html[data-theme="neon"] .wisdom-button { color: var(--accent) !important; }
+html[data-theme="neon"] .theme-switcher { background: var(--surface-2); border-color: var(--line); border-radius: 2px; }
+html[data-theme="neon"] .theme-swatch { border-radius: 2px; }
+html[data-theme="neon"] .theme-swatch:hover, html[data-theme="neon"] .theme-swatch[aria-pressed="true"], html[data-theme="neon"] .theme-swatch[data-theme-id="neon"] { background: rgba(34, 227, 255, .14); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent), 0 0 12px rgba(34, 227, 255, .35); }
+/* 主视觉：荧光标题，悬停故障字效 */
+html[data-theme="neon"] .eyebrow { color: var(--magenta); text-shadow: 0 0 10px rgba(255, 62, 165, .6); }
+html[data-theme="neon"] .eyebrow::before { content: '// '; }
+html[data-theme="neon"] .hero-title { position: relative; color: #fff; text-shadow: 0 0 6px rgba(34, 227, 255, .85), 0 0 24px rgba(34, 227, 255, .45); }
+html[data-theme="neon"] .hero-title::before, html[data-theme="neon"] .hero-title::after { content: attr(data-text); position: absolute; inset: 0; opacity: 0; pointer-events: none; text-shadow: none; }
+html[data-theme="neon"] .hero-title::before { color: var(--magenta); clip-path: inset(0 0 55% 0); }
+html[data-theme="neon"] .hero-title::after { color: var(--accent); clip-path: inset(50% 0 0 0); }
+html[data-theme="neon"] .hero-title:hover::before { opacity: .9; animation: neon-glitch-a .5s steps(2, end) infinite; }
+html[data-theme="neon"] .hero-title:hover::after { opacity: .9; animation: neon-glitch-b .5s steps(2, end) infinite; }
+html[data-theme="neon"] .hero-description { color: var(--muted); }
+html[data-theme="neon"] .hero-aside { border-left: 1px solid var(--line); }
+html[data-theme="neon"] .hero-aside-title { color: var(--accent); }
+/* HUD 面板 */
+html[data-theme="neon"] .form-card, html[data-theme="neon"] .reading-panel, html[data-theme="neon"] .ai-card, html[data-theme="neon"] .guide-dialog { background: var(--surface); border: 1px solid var(--line); border-radius: 2px; box-shadow: 0 0 0 1px rgba(34, 227, 255, .06), 0 0 30px rgba(34, 227, 255, .08); }
+html[data-theme="neon"] .quiet-badge, html[data-theme="neon"] .mode-badge, html[data-theme="neon"] .element-badge { background: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: 2px; box-shadow: 0 0 8px rgba(34, 227, 255, .3); text-transform: uppercase; }
+html[data-theme="neon"] .helper-text, html[data-theme="neon"] .reading-heading, html[data-theme="neon"] .stage-number, html[data-theme="neon"] .symbol-interpretation, html[data-theme="neon"] .empty-note, html[data-theme="neon"] .site-footer, html[data-theme="neon"] .guide-footnote, html[data-theme="neon"] .empty-copy { color: var(--muted); }
+html[data-theme="neon"] .reading-heading-title, html[data-theme="neon"] .empty-title, html[data-theme="neon"] .guide-title, html[data-theme="neon"] .culture-title, html[data-theme="neon"] .panel-title, html[data-theme="neon"] .result-title { color: #fff; }
+html[data-theme="neon"] .reading-heading-title::before { content: '[ '; color: var(--accent); }
+html[data-theme="neon"] .reading-heading-title::after { content: ' ]'; color: var(--accent); }
+html[data-theme="neon"] .guide-number { color: var(--magenta); text-shadow: 0 0 10px rgba(255, 62, 165, .6); }
+html[data-theme="neon"] .input-tabs { background: transparent; border-color: var(--line); border-radius: 2px; padding: 0; }
+html[data-theme="neon"] .input-tabs .q-tabs__content { gap: 0; }
+html[data-theme="neon"] .input-tabs .q-tab { border-radius: 0; color: var(--muted); }
+html[data-theme="neon"] .input-tabs .q-tab--active { background: rgba(34, 227, 255, .12); color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+html[data-theme="neon"] .form-card .q-field__control { background: rgba(7, 7, 13, .6); border-radius: 2px; transition: box-shadow .25s ease; }
+html[data-theme="neon"] .form-card .q-field--outlined .q-field__control:before { border-color: var(--line); }
+html[data-theme="neon"] .form-card .q-field--outlined .q-field__control:hover:before { border-color: var(--accent); }
+html[data-theme="neon"] .form-card .q-field--focused .q-field__control { box-shadow: 0 0 0 1px var(--accent), 0 0 18px rgba(34, 227, 255, .35); }
+html[data-theme="neon"] .form-card .q-field__label, html[data-theme="neon"] .form-card .q-field__native::placeholder, html[data-theme="neon"] .q-field__append, html[data-theme="neon"] .q-field__prepend { color: var(--muted); }
+html[data-theme="neon"] .form-card .q-field__native { color: #fff; }
+html[data-theme="neon"] .form-divider { background: var(--line); }
+html[data-theme="neon"] .local-note { color: var(--el-wood); }
+html[data-theme="neon"] .error-message { color: #ff5c7a; text-shadow: 0 0 8px rgba(255, 92, 122, .5); }
+html[data-theme="neon"] .submit-button { background: transparent !important; color: var(--accent) !important; border: 1px solid var(--accent); border-radius: 2px; box-shadow: 0 0 12px rgba(34, 227, 255, .35), inset 0 0 12px rgba(34, 227, 255, .12); transition: background-color .25s ease, color .25s ease, box-shadow .25s ease; }
+html[data-theme="neon"] .submit-button:hover { background: var(--accent) !important; color: #07070d !important; box-shadow: 0 0 30px rgba(34, 227, 255, .7); }
+html[data-theme="neon"] .guide-dialog .q-btn--unelevated { background: var(--accent) !important; color: #07070d !important; border-radius: 2px; box-shadow: 0 0 16px rgba(34, 227, 255, .45); font-family: var(--mono); }
+html[data-theme="neon"] .status-message::after { content: '▌'; margin-left: 4px; color: var(--accent); animation: neon-blink 1s steps(1) infinite; }
+html[data-theme="neon"] .input-snapshot { background: rgba(7, 7, 13, .6); border: 1px solid var(--line); border-left: 3px solid var(--magenta); border-radius: 2px; color: var(--ink); }
+/* 雷达空状态 */
+html[data-theme="neon"] .compass { border-color: rgba(34, 227, 255, .45); background: repeating-conic-gradient(from 0deg, rgba(34, 227, 255, .35) 0deg 1deg, transparent 1deg 30deg); box-shadow: inset 0 0 0 11px #07070d, inset 0 0 0 12px rgba(34, 227, 255, .4), inset 0 0 0 39px #07070d, 0 0 40px rgba(34, 227, 255, .18); overflow: hidden; }
+html[data-theme="neon"] .compass::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, rgba(34, 227, 255, .45), transparent 80deg); animation: neon-sweep 4s linear infinite; }
+html[data-theme="neon"] .compass > span { color: var(--accent); background: #07070d; font-family: var(--mono); }
+html[data-theme="neon"] .compass-inner { border-color: var(--magenta); background: #0a0a14; box-shadow: 0 0 20px rgba(255, 62, 165, .35); }
+html[data-theme="neon"] .compass-inner span { color: var(--magenta); text-shadow: 0 0 14px rgba(255, 62, 165, .9); }
+html[data-theme="neon"] .stage-guide-item + .stage-guide-item { border-left-color: var(--line); }
+/* 三传卡片：角标、扫描光带、荧光分色 */
+html[data-theme="neon"] .transmission-card { position: relative; background-color: var(--surface); border: 1px solid var(--line); border-radius: 2px; box-shadow: 0 0 18px rgba(34, 227, 255, .08); transition: transform .3s ease, box-shadow .3s ease; }
+html[data-theme="neon"] .transmission-card::before, html[data-theme="neon"] .transmission-card::after { content: ''; position: absolute; width: 14px; height: 14px; border: 2px solid var(--accent); pointer-events: none; }
+html[data-theme="neon"] .transmission-card::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+html[data-theme="neon"] .transmission-card::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+html[data-theme="neon"] .transmission-card:hover { transform: translateY(-3px); box-shadow: 0 0 0 1px var(--accent), 0 0 34px rgba(34, 227, 255, .25); background-image: linear-gradient(180deg, transparent 0%, rgba(34, 227, 255, .14) 50%, transparent 100%); background-size: 100% 40%; background-repeat: no-repeat; animation: neon-scan 1.4s linear infinite; }
+html[data-theme="neon"] .transmission-card[data-element="wood"]::before, html[data-theme="neon"] .transmission-card[data-element="wood"]::after { border-color: var(--el-wood); }
+html[data-theme="neon"] .transmission-card[data-element="fire"]::before, html[data-theme="neon"] .transmission-card[data-element="fire"]::after { border-color: var(--el-fire); }
+html[data-theme="neon"] .transmission-card[data-element="earth"]::before, html[data-theme="neon"] .transmission-card[data-element="earth"]::after { border-color: var(--el-earth); }
+html[data-theme="neon"] .transmission-card[data-element="metal"]::before, html[data-theme="neon"] .transmission-card[data-element="metal"]::after { border-color: var(--el-metal); }
+html[data-theme="neon"] .transmission-card[data-element="water"]::before, html[data-theme="neon"] .transmission-card[data-element="water"]::after { border-color: var(--el-water); }
+html[data-theme="neon"] .stage-label { color: #fff; font-family: var(--mono); }
+html[data-theme="neon"] .stage-label::before { content: '> '; color: var(--magenta); }
+html[data-theme="neon"] .symbol-name { color: var(--accent); text-shadow: 0 0 8px rgba(34, 227, 255, .9), 0 0 26px rgba(34, 227, 255, .5); animation: neon-flicker 7s linear infinite; }
+html[data-theme="neon"] .transmission-card:nth-child(2) .symbol-name { animation-delay: 2.3s; }
+html[data-theme="neon"] .transmission-card:nth-child(3) .symbol-name { animation-delay: 4.6s; }
+html[data-theme="neon"] .element-badge.element-wood { color: var(--el-wood); border-color: var(--el-wood); box-shadow: 0 0 8px rgba(124, 255, 154, .35); }
+html[data-theme="neon"] .element-badge.element-fire { color: var(--el-fire); border-color: var(--el-fire); box-shadow: 0 0 8px rgba(255, 107, 107, .35); }
+html[data-theme="neon"] .element-badge.element-earth { color: var(--el-earth); border-color: var(--el-earth); box-shadow: 0 0 8px rgba(255, 209, 102, .35); }
+html[data-theme="neon"] .element-badge.element-metal { color: var(--el-metal); border-color: var(--el-metal); box-shadow: 0 0 8px rgba(232, 244, 255, .35); }
+html[data-theme="neon"] .element-badge.element-water { color: var(--el-water); border-color: var(--el-water); box-shadow: 0 0 8px rgba(76, 201, 255, .35); }
+html[data-theme="neon"] .relation-block { border-top-color: var(--line); }
+html[data-theme="neon"] .relation-title { color: var(--magenta); }
+html[data-theme="neon"] .culture-panel { border-color: var(--line); border-radius: 2px; }
+html[data-theme="neon"] .ai-interpretation h3 { color: var(--accent); text-shadow: 0 0 10px rgba(34, 227, 255, .5); }
+html[data-theme="neon"] .ai-interpretation strong { color: #fff; }
+html[data-theme="neon"] .wisdom-strip { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--magenta); border-radius: 2px; }
+html[data-theme="neon"] .wisdom-mark { color: var(--magenta); border-right-color: var(--line); text-shadow: 0 0 12px rgba(255, 62, 165, .6); }
+html[data-theme="neon"] .site-footer { border-top-color: var(--line); }
+html[data-theme="neon"] .guide-footnote { background: var(--surface-2); border-left: 3px solid var(--accent); }
+/* Quasar 弹层 */
+html[data-theme="neon"] .q-menu { background: #0b0f1f; color: var(--ink); border: 1px solid var(--line); border-radius: 2px; box-shadow: 0 0 24px rgba(34, 227, 255, .15); }
+html[data-theme="neon"] .q-dialog__backdrop { background: rgba(2, 3, 10, .78); }
+html[data-theme="neon"] .q-expansion-item .q-item { color: var(--ink); }
+@keyframes neon-crt { 0% { transform: scale(.3, .004); filter: brightness(6); } 40% { transform: scale(1, .006); filter: brightness(4); } 100% { transform: none; filter: none; } }
+@keyframes neon-glitch-a { 0% { transform: translate(-3px, -1px); clip-path: inset(0 0 55% 0); } 50% { transform: translate(3px, 1px); clip-path: inset(12% 0 40% 0); } 100% { transform: translate(-2px, 0); clip-path: inset(4% 0 60% 0); } }
+@keyframes neon-glitch-b { 0% { transform: translate(3px, 1px); clip-path: inset(50% 0 0 0); } 50% { transform: translate(-3px, -1px); clip-path: inset(38% 0 8% 0); } 100% { transform: translate(2px, 0); clip-path: inset(58% 0 2% 0); } }
+@keyframes neon-blink { 50% { opacity: 0; } }
+@keyframes neon-sweep { to { transform: rotate(360deg); } }
+@keyframes neon-scan { from { background-position: 0 -40%; } to { background-position: 0 140%; } }
+@keyframes neon-flicker { 0%, 12%, 14%, 16%, 61%, 63%, 100% { opacity: 1; } 13%, 62% { opacity: .5; } }

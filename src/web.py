@@ -2,10 +2,13 @@
 """小六壬占卜 Web Interface，使用 NiceGUI 展示本地三传和可选AI解读。"""
 
 import os
+import re
 import sys
+import json
 import asyncio
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Optional
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -19,6 +22,36 @@ from utils.stroke_count import get_stroke_counts
 from utils.calendar_converter import date_to_numbers
 from utils.validation import validate_numbers, validate_chinese
 from utils.symbol_relations import describe_relation
+
+THEME_DIR = Path(__file__).with_name('themes')
+HERO_TITLE = '一念起，观三传。'
+# 五行→CSS 钩子；默认皮肤不使用这些类，仅供主题分色。
+ELEMENT_KEYS = {'木': 'wood', '火': 'fire', '土': 'earth', '金': 'metal', '水': 'water'}
+
+
+@dataclass(frozen=True)
+class Theme:
+    id: str
+    label: str
+    description: str
+    stylesheet: Optional[str]  # 相对 THEME_DIR；None 表示只用 web.css 的默认皮肤
+
+    def __post_init__(self):
+        # id 会不加引号地写入 HTML 属性与 CSS 选择器，文案会写入带引号的属性，导入时即拒绝不安全的值。
+        if not re.fullmatch(r'[a-z][a-z0-9-]*', self.id):
+            raise ValueError(f'主题 id 只能由小写字母、数字和连字符组成：{self.id!r}')
+        if '"' in self.label or '"' in self.description:
+            raise ValueError(f'主题文案不能包含双引号：{self.id}')
+
+
+# 首项为默认皮肤；切换、记忆与效果启停全部在浏览器端完成，见 themes/theme.js。
+THEMES = (
+    Theme('paper', '素纸', '暖白纸感 · 朱砂主色', None),
+    Theme('night', '星夜', '深空星图 · 鎏金流光', 'night.css'),
+    Theme('ink', '水墨', '宣纸留白 · 朱文印章', 'ink.css'),
+    Theme('neon', '霓虹', '赛博终端 · 荧光扫描', 'neon.css'),
+)
+DEFAULT_THEME = THEMES[0]
 
 
 class DivinationWebApp:
@@ -146,13 +179,14 @@ class DivinationWebApp:
             ui.label('项目九宫法 · 三传表示观察阶段，不对应确定期限。').classes('helper-text')
             with ui.element('div').classes('transmission-grid'):
                 for i, (symbol, (stage, hint)) in enumerate(zip(symbols, stages)):
-                    with ui.card().classes('transmission-card'):
+                    element_key = ELEMENT_KEYS.get(symbol.element.name, 'unknown')
+                    with ui.card().classes('transmission-card').props(f'data-element={element_key}'):
                         with ui.row().classes('section-heading'):
                             ui.label(stage).classes('stage-label')
                             ui.label(f'0{i + 1}').classes('stage-number')
                         ui.label(hint).classes('helper-text')
                         ui.label(symbol.name).classes('serif symbol-name')
-                        ui.badge(f'五行 · {symbol.element.name}', color=None).classes('element-badge')
+                        ui.badge(f'五行 · {symbol.element.name}', color=None).classes(f'element-badge element-{element_key}')
                         ui.label(symbol.description).classes('symbol-description')
                         ui.label(symbol.interpretation).classes('symbol-interpretation')
                         if i < 2:
@@ -206,10 +240,34 @@ class DivinationWebApp:
     def _on_model_change(self, e: ValueChangeEventArguments):
         self.current_model = next((model for model in self.available_models if model.value == e.value), None)
 
+    @staticmethod
+    def _add_theme_assets():
+        """web.css 之后注入主题脚本与各主题样式；脚本在首屏绘制前读取已保存的皮肤。"""
+        ids = json.dumps([theme.id for theme in THEMES], ensure_ascii=False)
+        ui.add_head_html(f'<script>window.MSR_THEME_IDS={ids};window.MSR_THEME_DEFAULT={json.dumps(DEFAULT_THEME.id)};</script>')
+        ui.add_head_html(f'<script>{(THEME_DIR / "theme.js").read_text(encoding="utf-8")}</script>')
+        for theme in THEMES:
+            if theme.stylesheet:
+                ui.add_css(THEME_DIR / theme.stylesheet)
+
+    @staticmethod
+    def _create_theme_switcher():
+        """纯客户端切换：点击只调用 window.msrTheme.apply，不经服务器。"""
+        with ui.element('div').classes('theme-switcher').props('role=group aria-label="切换皮肤"'):
+            for theme in THEMES:
+                pressed = 'true' if theme is DEFAULT_THEME else 'false'
+                button = ui.element('button').classes('theme-swatch').props(
+                    f'type=button data-theme-id={theme.id} aria-pressed={pressed} aria-label="{theme.label}" title="{theme.label} · {theme.description}"')
+                button.on('click', js_handler=f'() => window.msrTheme && window.msrTheme.apply({json.dumps(theme.id)})')
+                with button:
+                    ui.element('span').classes('swatch-dot').props('aria-hidden=true')
+                    ui.html(theme.label, tag='span').classes('swatch-label')
+
     def create_ui(self):
         now = datetime.now(timezone(timedelta(hours=8)))
         ui.colors(primary='#a34432', secondary='#69755e', negative='#b33c32')
         ui.add_css(Path(__file__).with_name('web.css'))
+        self._add_theme_assets()
         with ui.dialog() as guide, ui.card().classes('guide-dialog'):
             ui.label('从一问，到三传').classes('serif text-2xl')
             for title, copy in [
@@ -231,13 +289,14 @@ class DivinationWebApp:
                         ui.label('MINI SIX REN').classes('brand-english')
                 with ui.row().classes('header-actions'):
                     ui.label('传统智慧 · 当下启发').classes('header-tagline')
+                    self._create_theme_switcher()
                     ui.button('使用指南', icon='help_outline', on_click=guide.open).props('flat no-caps').classes('guide-button')
 
             with ui.element('main').classes('page-main'):
                 with ui.element('section').classes('hero'):
                     with ui.column().classes('hero-copy'):
                         ui.label('观 时 · 察 势 · 明 心').classes('eyebrow')
-                        ui.label('一念起，观三传。').classes('serif hero-title').props('role=heading aria-level=1')
+                        ui.label(HERO_TITLE).classes('serif hero-title').props(f'role=heading aria-level=1 data-text="{HERO_TITLE}"')
                         ui.label('以传统智慧为镜，理清当下，从容向前。').classes('hero-description')
                     with ui.column().classes('hero-aside'):
                         ui.label('小六壬 · 项目九宫法').classes('hero-aside-title')
