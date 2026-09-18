@@ -40,12 +40,21 @@ def repo_root() -> Path:
     return Path.cwd().resolve()
 
 
-def commit_all(message: str) -> str:
-    """Stage the working tree and commit it. Returns the new short sha."""
+def _require_repo() -> None:
     if not is_repo():
         raise RuntimeError(
             "not a git repository — a commit phase needs one. Run `git init` in the "
             "repo root (and make a first commit) before running an ADW that commits.")
+
+
+def commit_all(message: str) -> str:
+    """Stage the whole working tree and commit it. Returns the new short sha.
+
+    Prefer `commit_reported`: this sweeps in every untracked file in the repo,
+    reported or not — a stray `node_modules/` or scratch doc lands in the
+    agent's commit under the agent's message.
+    """
+    _require_repo()
     _git("add", "-A")
     if not _git("status", "--porcelain"):
         raise RuntimeError("nothing to commit — the preceding phases changed no files")
@@ -53,9 +62,95 @@ def commit_all(message: str) -> str:
     return _git("rev-parse", "--short", "HEAD")
 
 
+def reported_paths(*envelopes) -> list[str]:
+    """Every repo path the given envelopes claim to have produced or changed.
+
+    Reads the fields each output type carries — `changed_files` (builder),
+    `artifacts` (everyone), `document_path` / `documented_files` (documenter) —
+    so a commit phase can hand over whatever agents ran before it without
+    knowing their types. Runtime artifacts under data_dir are gitignored and
+    fall out naturally at staging time.
+    """
+    paths: list[str] = []
+    for envelope in envelopes:
+        if envelope is None:
+            continue
+        paths += list(getattr(envelope, "changed_files", []) or [])
+        paths += list(getattr(envelope, "artifacts", []) or [])
+        paths += list(getattr(envelope, "documented_files", []) or [])
+        document_path = getattr(envelope, "document_path", "")
+        if document_path:
+            paths.append(document_path)
+    return _relative(paths)
+
+
+def _relative(paths: list[str]) -> list[str]:
+    """Normalise to repo-relative POSIX paths; drop anything outside the repo."""
+    root = repo_root()
+    out: list[str] = []
+    for raw in paths:
+        if not raw:
+            continue
+        path = Path(raw)
+        if path.is_absolute():
+            try:
+                path = path.resolve().relative_to(root)
+            except ValueError:
+                continue
+        out.append(path.as_posix().rstrip("/"))
+    return out
+
+
+def _covered(status_path: str, reported: list[str]) -> bool:
+    """A dirty path is staged when a reported path names it or a directory above it."""
+    return any(status_path == r or status_path.startswith(r + "/") for r in reported)
+
+
+def commit_reported(message: str, *envelopes) -> tuple[str, list[str]]:
+    """Stage only the dirty paths the envelopes reported, then commit.
+
+    Returns `(short_sha, left_behind)`, where `left_behind` is every dirty path
+    nobody reported — still in the working tree, deliberately uncommitted, so
+    the phase can log it and the engineer can see what the agent forgot to
+    claim (or what was never the agent's to begin with).
+    """
+    _require_repo()
+    reported = reported_paths(*envelopes)
+    dirty = changed_files()
+    to_stage = [path for path in dirty if _covered(path, reported)]
+    left_behind = [path for path in dirty if path not in to_stage]
+    if not to_stage:
+        raise RuntimeError(
+            "nothing to commit — no reported file is dirty. "
+            f"reported={reported or '[]'}, dirty={dirty or '[]'}")
+    # `-A` with a pathspec stages deletions and renames within it, not just adds.
+    _git("add", "-A", "--", *to_stage)
+    _git("commit", "-m", message)
+    return _git("rev-parse", "--short", "HEAD"), left_behind
+
+
 def changed_files() -> list[str]:
-    out = _git("status", "--porcelain")
-    return [line[3:] for line in out.splitlines() if line]
+    """Every dirty path: modified, added, deleted, or untracked (respecting .gitignore).
+
+    `-z` gives raw NUL-separated paths — the default output octal-escapes
+    non-ASCII names, which would hide every `数据.json` from the commit.
+    """
+    result = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all", "-z"],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"git status failed: {result.stderr.strip()}")
+    entries = result.stdout.split("\0")
+    paths = []
+    i = 0
+    while i < len(entries):
+        entry = entries[i]
+        i += 1
+        if not entry:
+            continue
+        paths.append(entry[3:])
+        if entry[0] in "RC":            # rename/copy: the next entry is the source path
+            i += 1
+    return paths
 
 
 # ── diff plumbing (composed into a ChangeSet by documentation.py) ────────────

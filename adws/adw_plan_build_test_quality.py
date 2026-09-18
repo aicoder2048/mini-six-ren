@@ -44,6 +44,7 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
                                description="Implement the plan exactly")) as ph:
         previous = ph.call(AgentCall(output_type=BuildOutput, prompt=prompt, previous=plan,
                                      gates=[gates.diff_matches_claims]))
+    builds = [previous]                 # every builder envelope, so the commit stages all of them
 
     def record(ph, result) -> None:
         passed = sum(1 for check in result.checks if check.passed)
@@ -76,6 +77,7 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
             previous = ph.call(AgentCall(output_type=BuildOutput, prompt=prompt,
                                          previous=quality.as_envelope(broken, what),
                                          gates=[gates.diff_matches_claims]))
+            builds.append(previous)
 
     verified = (quality_result is not None and quality_result.passed
                 and test_result is not None and test_result.passed)
@@ -83,7 +85,8 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
         with run.phase(PhaseParams(name="commit", kind="code", owner="git",
                                    description="Commit the tested and quality-verified working tree")) as ph:
             message = previous.commit_message or f"sssf({run.adw_id}): {previous.summary}"
-            ph.log(sha=git_helper.commit_all(message), message=message)
+            sha, left_behind = git_helper.commit_reported(message, plan, *builds)
+            ph.log(sha=sha, message=message, left_uncommitted=", ".join(left_behind) or "none")
 
     return run.finish(accepted=verified,
                       reason=f"verify/test never came back clean after {MAX_FIX_LOOPS} fix attempt(s)")

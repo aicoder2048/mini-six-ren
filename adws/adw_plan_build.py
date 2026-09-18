@@ -41,7 +41,8 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
     with run.phase(PhaseParams(name="commit", kind="code", owner="git",
                                description="Land the builder's changes, using the message it wrote")) as ph:
         message = build.commit_message or f"sssf({run.adw_id}): {build.summary}"
-        ph.log(sha=git_helper.commit_all(message), message=message)
+        sha, left_behind = git_helper.commit_reported(message, plan, build)
+        ph.log(sha=sha, message=message, left_uncommitted=", ".join(left_behind) or "none")
 
     return run.finish()
 

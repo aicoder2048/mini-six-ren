@@ -64,10 +64,16 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
     run = session.ensure(cfg, adw_id)
     baseline = git_helper.rev("HEAD")     # pinned before this run commits anything
 
-    def commit(ph, envelope) -> None:
-        """Commit what the preceding phase produced, in that agent's own words."""
+    def commit(ph, envelope, *also) -> None:
+        """Commit what the preceding phase produced, in that agent's own words.
+
+        Only the paths those envelopes reported are staged; anything else dirty
+        in the tree is logged as left_uncommitted, never swept in under an
+        agent's message.
+        """
         message = envelope.commit_message or f"sssf({run.adw_id}): {envelope.summary}"
-        ph.log(sha=git_helper.commit_all(message), message=message)
+        sha, left_behind = git_helper.commit_reported(message, envelope, *also)
+        ph.log(sha=sha, message=message, left_uncommitted=", ".join(left_behind) or "none")
 
     def record(ph, result) -> None:
         """Log a deterministic block's verdict — the same shape every ADW uses."""
@@ -92,6 +98,7 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
                                description="Implement the plan exactly")) as ph:
         build = ph.call(AgentCall(output_type=BuildOutput, prompt=prompt, previous=plan,
                                   gates=[gates.diff_matches_claims]))
+    builds = [build]                    # every builder envelope: build, fixes, revisions
 
     test = None
     for i in range(1, MAX_FIX_LOOPS + 1):
@@ -110,6 +117,7 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
             build = ph.call(AgentCall(output_type=BuildOutput, prompt=prompt,
                                       previous=quality.as_envelope(test, "tests"),
                                       gates=[gates.diff_matches_claims]))
+            builds.append(build)
 
     review = None
     revised = False
@@ -126,6 +134,7 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
                                    description="Close the reviewer's blocking findings")) as ph:
             build = ph.call(AgentCall(output_type=BuildOutput, prompt=prompt, previous=review,
                                       gates=[gates.diff_matches_claims]))
+            builds.append(build)
             revised = True
 
     # A revision edited code after the suite last ran, so the green light is
@@ -145,7 +154,7 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
     if verified:
         with run.phase(PhaseParams(name="commit_build", kind="code", owner="git",
                                    description="Land the code only now: green suite, approved review")) as ph:
-            commit(ph, build)
+            commit(ph, build, *builds[:-1])
 
         with run.phase(PhaseParams(name="changes", kind="code", owner="git",
                                    description="Diff the whole run against its pinned baseline, for the documenter")) as ph:
