@@ -17,10 +17,19 @@ from datetime import datetime
 import random
 import os
 import re
+import argparse
+import json
+import sys
 
 from utils.symbol_relations import describe_relation
 
 console = Console()
+
+error_console = Console(stderr=True)
+
+EXIT_SUCCESS = 0
+EXIT_INPUT_ERROR = 1
+EXIT_USAGE_ERROR = 2
 
 def format_prediction(result):
     symbols = result.symbols
@@ -398,7 +407,8 @@ def validate_chinese_chars(chars_input):
     except ValueError as exc:
         return False, str(exc)
 
-def main():
+def interactive_main():
+    set_current_working_dir()
     clear_screen()
     display_colorful_title()
     
@@ -488,6 +498,82 @@ def xiaoliu_submenu():
                     console.print(f'[red]AI解读失败：{exc}[/red]')
 
 
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog='cli.py',
+        description='小六壬三传本地起课。不带参数进入交互菜单；带参数只做本地计算，不调用 AI、不发起网络请求。',
+    )
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--numbers', metavar='1,2,3', help='三个 1-999 的整数，逗号分隔')
+    group.add_argument('--date', metavar='YYYY-MM-DD', help='公历日期，需与 --time 一起使用')
+    group.add_argument('--chars', metavar='天地人', help='三个汉字，按字典笔画起课')
+    parser.add_argument('--time', metavar='HH:MM', help='北京时间（UTC+8），只能与 --date 一起使用')
+    parser.add_argument('--json', action='store_true', dest='as_json', help='输出结构化 JSON（纯 JSON，便于程序消费）')
+    return parser
+
+
+def resolve_numbers(args):
+    """按输入模式解析起课数字，返回 (numbers, input_summary)。非法输入抛 ValueError。"""
+    if args.numbers is not None:
+        numbers = validate_numbers(args.numbers.split(','))
+        return numbers, {'mode': 'numbers', 'numbers': numbers}
+    if args.date is not None:
+        numbers = date_to_numbers(args.date, args.time)
+        return numbers, {'mode': 'date', 'date': args.date, 'time': args.time, 'numbers': numbers}
+    chars = validate_chinese(args.chars)
+    numbers = get_stroke_counts(chars)
+    return numbers, {'mode': 'chars', 'chars': chars, 'numbers': numbers}
+
+
+def build_json_payload(prediction, input_summary):
+    symbols = prediction.symbols
+    relations = prediction.relations
+    return {
+        'input': input_summary,
+        'symbols': [
+            {'name': symbol.name, 'element': symbol.element.name}
+            for symbol in symbols
+        ],
+        'relations': list(relations),
+        'relation_descriptions': [
+            describe_relation(symbols[i], symbols[i + 1], relations[i])
+            for i in range(len(relations))
+        ],
+    }
+
+
+def run_batch(args):
+    """非交互起课：只写 stdout，不触碰 AI、网络、菜单。"""
+    try:
+        numbers, input_summary = resolve_numbers(args)
+        prediction = HandTechnique.predict(*numbers)
+    except ValueError as exc:
+        error_console.print(f'[bold red]输入错误：{exc}[/bold red]')
+        return EXIT_INPUT_ERROR
+    if args.as_json:
+        print(json.dumps(build_json_payload(prediction, input_summary), ensure_ascii=False, indent=2))
+    else:
+        console.print(format_prediction(prediction))
+    return EXIT_SUCCESS
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    if args.date is not None and args.time is None:
+        error_console.print('[bold red]参数错误：使用 --date 时必须同时提供 --time（格式 HH:MM）。[/bold red]')
+        return EXIT_USAGE_ERROR
+    if args.time is not None and args.date is None:
+        error_console.print('[bold red]参数错误：--time 只能与 --date 一起使用。[/bold red]')
+        return EXIT_USAGE_ERROR
+    if args.numbers is None and args.date is None and args.chars is None:
+        if args.as_json:
+            error_console.print('[bold red]参数错误：--json 需要与 --numbers、--date 或 --chars 之一一起使用。[/bold red]')
+            return EXIT_USAGE_ERROR
+        interactive_main()
+        return EXIT_SUCCESS
+    return run_batch(args)
+
+
 def set_current_working_dir():
     import os
     import sys
@@ -508,5 +594,4 @@ def set_current_working_dir():
 
 
 if __name__ == "__main__":
-    set_current_working_dir()
-    main()
+    sys.exit(main())

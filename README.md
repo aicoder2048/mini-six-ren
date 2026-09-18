@@ -63,8 +63,11 @@ uv sync
 
 #### CLI版本（命令行界面）
 ```bash
-# 启动小六壬占卜系统CLI版
+# 启动小六壬占卜系统CLI版（不带参数进入交互菜单）
 uv run src/cli.py
+
+# 非交互：直接起课，可脚本化调用，详见「CLI 非交互 / 脚本调用」
+uv run src/cli.py --numbers 1,2,3 --json
 ```
 
 #### Web版本（现代化网页界面）
@@ -218,6 +221,46 @@ Web先展示本地三传；选择AI并填写问题时再等待完整解读，生
 │            │ 比和   │            │ 被克   │            │
 │            │ 同属木 │            │ 金克木 │            │
 └─────────────┴────────┴─────────────┴────────┴─────────────┘
+```
+
+#### CLI 非交互 / 脚本调用
+
+```bash
+# 三个数字直接起课（输出与交互模式相同的三传表）
+uv run src/cli.py --numbers 1,2,3
+
+# 按北京时间（UTC+8）取公历日期与时辰，走共享的日期换算
+uv run src/cli.py --date 2026-09-17 --time 14:00
+
+# 三个汉字按字典笔画起课
+uv run src/cli.py --chars 天地人
+
+# 结构化 JSON 输出（stdout 只有 JSON）
+uv run src/cli.py --numbers 1,2,3 --json
+```
+
+- 不带参数运行仍进入原有交互菜单，行为不变。
+- 非交互路径只做本地计算，不调用 AI、不发起任何网络请求。
+- 错误信息输出到 stderr，且退出码非 0：`1` 表示输入值非法（越界数字、错误日期时间、非汉字），`2` 表示参数组合错误。
+- `--time` 必须与 `--date` 一起使用；`--date`/`--numbers`/`--chars` 三者互斥。
+- `--json` 的 stdout 是纯 JSON 文档，字段与 `Prediction` 一致（符号名、五行、关系、方向说明＋输入快照），可直接 `json.loads`。
+
+`uv run src/cli.py --numbers 1,2,3 --json` 的输出示例：
+
+```json
+{
+  "input": {
+    "mode": "numbers",
+    "numbers": [1, 2, 3]
+  },
+  "symbols": [
+    {"name": "大安", "element": "木"},
+    {"name": "留连", "element": "木"},
+    {"name": "赤口", "element": "金"}
+  ],
+  "relations": ["比和", "被克"],
+  "relation_descriptions": ["同属木，性质相近", "金克木，后传克前传"]
+}
 ```
 
 #### 五行关系说明
