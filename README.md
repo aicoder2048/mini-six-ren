@@ -249,6 +249,9 @@ uv run src/cli.py --numbers 1,2,3 --question "近期求职" --model deepseek:dee
 
 # AI 解读同时保留结构化输出；失败时 interpretation 为 null 并给出 error
 uv run src/cli.py --numbers 1,2,3 --question "近期求职" --json
+
+# 查看全部参数
+uv run src/cli.py --help
 ```
 
 - 不带参数运行仍进入原有交互菜单，行为不变。
