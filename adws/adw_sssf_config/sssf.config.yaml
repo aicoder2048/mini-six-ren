@@ -48,7 +48,7 @@ agents:
     harness_engineering:
       - adws/adw_data/harness_engineering/subagents.ts    # registers the four subagent_* tools below
     writes:                        # the plan is the only thing it may leave in the repo
-      - specs/
+      - docs/specs/
     tools:                         # full recon + write for plan.md; no edit — the planner never touches repo files
       - read
       - grep
