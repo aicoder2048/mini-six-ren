@@ -68,6 +68,9 @@ uv run src/cli.py
 
 # 非交互：直接起课，可脚本化调用，详见「CLI 非交互 / 脚本调用」
 uv run src/cli.py --numbers 1,2,3 --json
+
+# 非交互 + AI 解读：先打印本地三传，再输出解读（需配置 API 密钥）
+uv run src/cli.py --numbers 1,2,3 --question "近期求职"
 ```
 
 #### Web版本（现代化网页界面）
@@ -237,13 +240,27 @@ uv run src/cli.py --chars 天地人
 
 # 结构化 JSON 输出（stdout 只有 JSON）
 uv run src/cli.py --numbers 1,2,3 --json
+
+# 可选 AI 解读：先打印本地三传，再输出解读（需在 .env 配置 OPENAI_API_KEY 或 DEEPSEEK_API_KEY）
+uv run src/cli.py --numbers 1,2,3 --question "近期求职"
+
+# 指定模型（取值为 SupportedModels 标识；缺省用第一个可用模型）
+uv run src/cli.py --numbers 1,2,3 --question "近期求职" --model deepseek:deepseek-flash
+
+# AI 解读同时保留结构化输出；失败时 interpretation 为 null 并给出 error
+uv run src/cli.py --numbers 1,2,3 --question "近期求职" --json
 ```
 
 - 不带参数运行仍进入原有交互菜单，行为不变。
-- 非交互路径只做本地计算，不调用 AI、不发起任何网络请求。
-- 错误信息输出到 stderr，且退出码非 0：`1` 表示输入值非法（越界数字、错误日期时间、非汉字），`2` 表示参数组合错误。
+- 不带 `--question` 时非交互路径只做本地计算，不调用 AI、不发起任何网络请求（行为与之前逐字相同）。
+- 给出 `--question` 时，先完整打印本地三传，再调用 AI 解读并输出；解读复用交互菜单同一路径（同一 Prompt、同一 2400 token 预算）。
+- `--model` 取值为 `SupportedModels` 的模型标识（`openai:gpt-5.6`、`deepseek:deepseek-flash`）；缺省取 `DivinationAgent.get_available_models()` 的第一个可用模型；未给出 `--question` 时 `--model` 不影响输出。
+- `--question` 空白等价于「不使用 AI」；`--json`/`--question`/`--model` 未与 `--numbers`/`--date`/`--chars` 一起使用时是参数错误。
+- 错误信息输出到 stderr，且退出码非 0：`1` 表示输入值非法（越界数字、错误日期时间、非汉字）；`2` 表示参数组合或取值错误；`3` 表示无可用模型或 AI 调用失败。
+- AI 失败时本地三传仍完整输出、不被清除，错误写 stderr；`--json` 失败时 stdout 仍是纯 JSON（`interpretation` 为 `null`，另有 `error` 字符串）。
+- 解读生成期间不打印流式进度，stdout 只保留最终结果（便于管道/重定向）；文本模式下解读只出现一次。
 - `--time` 必须与 `--date` 一起使用；`--date`/`--numbers`/`--chars` 三者互斥。
-- `--json` 的 stdout 是纯 JSON 文档，字段与 `Prediction` 一致（符号名、五行、关系、方向说明＋输入快照），可直接 `json.loads`。
+- `--json` 的 stdout 是纯 JSON 文档，字段与 `Prediction` 一致（符号名、五行、关系、方向说明＋输入快照）；带 `--question` 时额外给出 `question` 与 `interpretation`，可直接 `json.loads`。
 
 `uv run src/cli.py --numbers 1,2,3 --json` 的输出示例：
 

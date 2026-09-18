@@ -12,6 +12,7 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 
 import cli
+from ai_agent import SupportedModels
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -149,7 +150,192 @@ class NonInteractiveEntry(unittest.TestCase):
                 self.assertIn('参数错误', stderr)
 
 
+def offline_agent(models=(SupportedModels.DEEPSEEK_FLASH,),
+                  interpretation='【离线替身解读】', error=None):
+    """离线 AI 替身：patch cli.DivinationAgent 用，绝不发起网络请求。"""
+    agent = Mock()
+    agent.get_available_models.return_value = list(models)
+    if error is not None:
+        agent.return_value.interpret_prediction.side_effect = error
+    else:
+        agent.return_value.interpret_prediction.return_value = interpretation
+    return agent
+
+
+class NonInteractiveQuestion(unittest.TestCase):
+    """--question/--model 契约。所有 AI 路径都用进程内离线替身，不发起付费请求。"""
+
+    def test_question_prints_local_table_then_interpretation(self):
+        agent = offline_agent()
+        with patch('cli.DivinationAgent', agent):
+            code, stdout, stderr = run_cli(['--numbers', '1,2,3', '--question', '近期求职'])
+        self.assertEqual(code, 0)
+        self.assertIn('大安', stdout)
+        self.assertIn('【离线替身解读】', stdout)
+        self.assertLess(stdout.index('大安'), stdout.index('【离线替身解读】'))
+        self.assertEqual(stderr, '')
+
+    def test_interpretation_receives_symbols_and_question(self):
+        agent = offline_agent()
+        with patch('cli.DivinationAgent', agent):
+            code, _, _ = run_cli(['--numbers', '1,2,3', '--question', '近期求职'])
+        self.assertEqual(code, 0)
+        symbols, question = agent.return_value.interpret_prediction.call_args[0]
+        self.assertEqual([symbol.name for symbol in symbols], ['大安', '留连', '赤口'])
+        self.assertEqual(question, '近期求职')
+
+    def test_default_model_is_first_available(self):
+        agent = offline_agent(models=(SupportedModels.DEEPSEEK_FLASH, SupportedModels.OPENAI_GPT56))
+        with patch('cli.DivinationAgent', agent):
+            code, _, _ = run_cli(['--numbers', '1,2,3', '--question', 'x'])
+        self.assertEqual(code, 0)
+        agent.assert_called_once_with(SupportedModels.DEEPSEEK_FLASH)
+
+    def test_explicit_model_is_used(self):
+        agent = offline_agent(models=())
+        with patch('cli.DivinationAgent', agent):
+            code, _, _ = run_cli(
+                ['--numbers', '1,2,3', '--question', 'x', '--model', 'deepseek:deepseek-flash'])
+        self.assertEqual(code, 0)
+        agent.assert_called_once_with(SupportedModels.DEEPSEEK_FLASH)
+        agent.get_available_models.assert_not_called()
+
+    def test_model_without_question_stays_local_only(self):
+        baseline_code, baseline_stdout, _ = run_cli(['--numbers', '1,2,3'])
+        agent = offline_agent()
+        with patch('cli.DivinationAgent', agent):
+            code, stdout, stderr = run_cli(
+                ['--numbers', '1,2,3', '--model', 'deepseek:deepseek-flash'])
+        self.assertEqual(baseline_code, 0)
+        self.assertEqual(code, 0)
+        self.assertEqual(stdout, baseline_stdout)
+        self.assertEqual(stderr, '')
+        agent.assert_not_called()
+
+    def test_invalid_model_exits_usage_error(self):
+        code, stdout, stderr = run_cli(['--numbers', '1,2,3', '--model', 'not-a-model'])
+        self.assertEqual(code, 2)
+        self.assertEqual(stdout, '')
+        self.assertIn('参数错误', stderr)
+        self.assertIn('--model', stderr)
+
+    def test_question_without_input_mode_exits_usage_error(self):
+        for argv in (['--question', '近期求职'], ['--model', 'deepseek:deepseek-flash']):
+            with self.subTest(argv=argv), \
+                 patch('cli.DivinationAgent') as agent, \
+                 patch('cli.interactive_main') as interactive:
+                code, stdout, stderr = run_cli(argv)
+            self.assertEqual(code, 2)
+            self.assertEqual(stdout, '')
+            self.assertIn('参数错误', stderr)
+            agent.assert_not_called()
+            interactive.assert_not_called()
+
+    def test_blank_question_stays_local_only(self):
+        _, baseline_stdout, _ = run_cli(['--numbers', '1,2,3'])
+        baseline_payload = json.loads(run_cli(['--numbers', '1,2,3', '--json'])[1])
+        agent = offline_agent()
+        with patch('cli.DivinationAgent', agent):
+            code, stdout, stderr = run_cli(['--numbers', '1,2,3', '--question', '   '])
+            json_code, json_stdout, _ = run_cli(['--numbers', '1,2,3', '--json', '--question', '  '])
+        self.assertEqual(code, 0)
+        self.assertEqual(stdout, baseline_stdout)
+        self.assertEqual(stderr, '')
+        self.assertEqual(json_code, 0)
+        self.assertEqual(json.loads(json_stdout), baseline_payload)
+        agent.assert_not_called()
+
+    def test_no_available_model_with_question_exits_three(self):
+        agent = offline_agent(models=())
+        with patch('cli.DivinationAgent', agent):
+            code, stdout, stderr = run_cli(['--numbers', '1,2,3', '--question', 'x'])
+        self.assertEqual(code, 3)
+        self.assertIn('大安', stdout)
+        self.assertIn('模型', stderr)
+        self.assertIn('AI解读失败', stderr)
+        agent.assert_not_called()
+        agent.return_value.assert_not_called()
+
+    def test_no_available_model_json_payload(self):
+        agent = offline_agent(models=())
+        with patch('cli.DivinationAgent', agent):
+            code, stdout, stderr = run_cli(['--numbers', '1,2,3', '--json', '--question', 'x'])
+        self.assertEqual(code, 3)
+        payload = json.loads(stdout)
+        self.assertEqual(payload['question'], 'x')
+        self.assertIsNone(payload['interpretation'])
+        self.assertTrue(payload['error'])
+        self.assertEqual([symbol['name'] for symbol in payload['symbols']], ['大安', '留连', '赤口'])
+        self.assertEqual(payload['relations'], ['比和', '被克'])
+        self.assertNotEqual(stderr, '')
+
+    def test_ai_failure_keeps_local_result_text(self):
+        agent = offline_agent(error=RuntimeError('provider down'))
+        with patch('cli.DivinationAgent', agent):
+            code, stdout, stderr = run_cli(['--numbers', '1,2,3', '--question', 'x'])
+        self.assertEqual(code, 3)
+        for fragment in ('大安', '留连', '赤口', '金克木，后传克前传'):
+            self.assertIn(fragment, stdout)
+        self.assertNotIn('【离线替身解读】', stdout)
+        self.assertIn('AI解读失败', stderr)
+        self.assertIn('provider down', stderr)
+
+    def test_ai_failure_keeps_local_result_json(self):
+        baseline = json.loads(run_cli(['--numbers', '1,2,3', '--json'])[1])
+        agent = offline_agent(error=RuntimeError('provider down'))
+        with patch('cli.DivinationAgent', agent):
+            code, stdout, stderr = run_cli(['--numbers', '1,2,3', '--json', '--question', 'x'])
+        self.assertEqual(code, 3)
+        payload = json.loads(stdout)
+        self.assertIsNone(payload['interpretation'])
+        self.assertIn('provider down', payload['error'])
+        self.assertEqual(payload['symbols'], baseline['symbols'])
+        self.assertEqual(payload['relations'], baseline['relations'])
+        self.assertEqual(payload['relation_descriptions'], baseline['relation_descriptions'])
+        self.assertIn('provider down', stderr)
+
+    def test_json_with_question_success_adds_two_fields(self):
+        agent = offline_agent()
+        with patch('cli.DivinationAgent', agent):
+            code, stdout, stderr = run_cli(['--numbers', '1,2,3', '--json', '--question', '近期求职'])
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout)
+        self.assertEqual(set(payload), {'input', 'symbols', 'relations', 'relation_descriptions',
+                                        'question', 'interpretation'})
+        self.assertEqual(payload['question'], '近期求职')
+        self.assertEqual(payload['interpretation'], '【离线替身解读】')
+        self.assertEqual(stderr, '')
+
+    def test_ai_progress_output_never_reaches_stdout(self):
+        def chatty(symbols, question):
+            print('PROGRESS-CHATTER')
+            return '【离线替身解读】'
+
+        agent = offline_agent()
+        agent.return_value.interpret_prediction.side_effect = chatty
+        with patch('cli.DivinationAgent', agent):
+            json_code, json_stdout, _ = run_cli(['--numbers', '1,2,3', '--json', '--question', 'x'])
+            text_code, text_stdout, _ = run_cli(['--numbers', '1,2,3', '--question', 'x'])
+        self.assertEqual(json_code, 0)
+        json.loads(json_stdout)
+        self.assertNotIn('PROGRESS-CHATTER', json_stdout)
+        self.assertEqual(text_code, 0)
+        self.assertNotIn('PROGRESS-CHATTER', text_stdout)
+        self.assertEqual(text_stdout.count('【离线替身解读】'), 1)
+
+    def test_question_stdout_keeps_local_prefix(self):
+        _, plain_stdout, _ = run_cli(['--numbers', '1,2,3'])
+        agent = offline_agent()
+        with patch('cli.DivinationAgent', agent):
+            code, stdout, _ = run_cli(['--numbers', '1,2,3', '--question', '近期求职'])
+        self.assertEqual(code, 0)
+        self.assertTrue(stdout.startswith(plain_stdout))
+
+
 class NonInteractiveSubprocess(unittest.TestCase):
+    """进程级用法/取值错误。带输入模式的 --question 会用 .env 真实密钥发起付费请求，
+    因此 AI 路径只在 NonInteractiveQuestion 里用进程内替身验证。"""
+
     def _run(self, *args):
         environment = os.environ | {'PYTHONIOENCODING': 'utf-8'}
         return subprocess.run(
@@ -180,6 +366,17 @@ class NonInteractiveSubprocess(unittest.TestCase):
 
     def test_missing_time_exit_code(self):
         result = self._run('--date', '2026-09-17')
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, '')
+
+    def test_invalid_model_exit_code(self):
+        result = self._run('--numbers', '1,2,3', '--model', 'not-a-model')
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, '')
+        self.assertIn('参数错误', result.stderr)
+
+    def test_question_without_input_mode_exit_code(self):
+        result = self._run('--question', '近期求职')
         self.assertEqual(result.returncode, 2)
         self.assertEqual(result.stdout, '')
 

@@ -14,6 +14,8 @@ from rich.style import Style
 from rich.table import Table 
 from utils.validation import parse_datetime, normalize_gender, validate_numbers, validate_chinese
 from datetime import datetime 
+import contextlib
+import io
 import random
 import os
 import re
@@ -30,6 +32,14 @@ error_console = Console(stderr=True)
 EXIT_SUCCESS = 0
 EXIT_INPUT_ERROR = 1
 EXIT_USAGE_ERROR = 2
+EXIT_AI_ERROR = 3
+
+NO_MODEL_MESSAGE = (
+    '未配置可用的AI模型：请在 .env 中设置 OPENAI_API_KEY 或 DEEPSEEK_API_KEY，'
+    '或去掉 --question 仅做本地计算。'
+)
+
+SUPPORTED_MODELS_BY_VALUE = {model.value: model for model in SupportedModels}
 
 def format_prediction(result):
     symbols = result.symbols
@@ -501,7 +511,7 @@ def xiaoliu_submenu():
 def build_parser():
     parser = argparse.ArgumentParser(
         prog='cli.py',
-        description='小六壬三传本地起课。不带参数进入交互菜单；带参数只做本地计算，不调用 AI、不发起网络请求。',
+        description='小六壬三传起课。不带参数进入交互菜单；带参数做本地计算，给出 --question 时再调用 AI 解读。',
     )
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--numbers', metavar='1,2,3', help='三个 1-999 的整数，逗号分隔')
@@ -509,6 +519,11 @@ def build_parser():
     group.add_argument('--chars', metavar='天地人', help='三个汉字，按字典笔画起课')
     parser.add_argument('--time', metavar='HH:MM', help='北京时间（UTC+8），只能与 --date 一起使用')
     parser.add_argument('--json', action='store_true', dest='as_json', help='输出结构化 JSON（纯 JSON，便于程序消费）')
+    parser.add_argument('--question', metavar='求问事项', default=None,
+                        help='求问事项；给出时先打印本地三传，再调用 AI 解读（需要配置 API 密钥）')
+    parser.add_argument('--model', metavar='MODEL', default=None,
+                        help='AI 模型标识（openai:gpt-5.6 或 deepseek:deepseek-flash）；缺省取第一个可用模型。'
+                             '仅在给出 --question 时生效')
     return parser
 
 
@@ -525,10 +540,10 @@ def resolve_numbers(args):
     return numbers, {'mode': 'chars', 'chars': chars, 'numbers': numbers}
 
 
-def build_json_payload(prediction, input_summary):
+def build_json_payload(prediction, input_summary, question=None, interpretation=None, error=None):
     symbols = prediction.symbols
     relations = prediction.relations
-    return {
+    payload = {
         'input': input_summary,
         'symbols': [
             {'name': symbol.name, 'element': symbol.element.name}
@@ -540,20 +555,65 @@ def build_json_payload(prediction, input_summary):
             for i in range(len(relations))
         ],
     }
+    if question is not None:
+        payload['question'] = question
+        payload['interpretation'] = interpretation
+        if error is not None:
+            payload['error'] = error
+    return payload
+
+
+def resolve_model(requested):
+    """返回要使用的 SupportedModels；--model 缺省时取首个可用模型，无可用模型返回 None。"""
+    if requested is not None:
+        return SUPPORTED_MODELS_BY_VALUE[requested]
+    available_models = DivinationAgent.get_available_models()
+    return available_models[0] if available_models else None
+
+
+def run_ai_interpretation(prediction, question, model):
+    """复用交互菜单同一解读路径；AI 内部进度/流式输出不得进入本进程 stdout。"""
+    with contextlib.redirect_stdout(io.StringIO()):
+        return DivinationAgent(model).interpret_prediction(prediction.symbols, question)
 
 
 def run_batch(args):
-    """非交互起课：只写 stdout，不触碰 AI、网络、菜单。"""
+    """非交互起课：本地计算必先完成；给出 --question 时才调用 AI。"""
     try:
         numbers, input_summary = resolve_numbers(args)
         prediction = HandTechnique.predict(*numbers)
     except ValueError as exc:
         error_console.print(f'[bold red]输入错误：{exc}[/bold red]')
         return EXIT_INPUT_ERROR
-    if args.as_json:
-        print(json.dumps(build_json_payload(prediction, input_summary), ensure_ascii=False, indent=2))
-    else:
+
+    question = (args.question or '').strip() or None
+
+    if not args.as_json:
         console.print(format_prediction(prediction))
+
+    interpretation = None
+    ai_error = None
+    if question is not None:
+        model = resolve_model(args.model)
+        if model is None:
+            ai_error = NO_MODEL_MESSAGE
+        else:
+            try:
+                interpretation = run_ai_interpretation(prediction, question, model)
+            except Exception as exc:
+                ai_error = str(exc)
+
+    if args.as_json:
+        print(json.dumps(
+            build_json_payload(prediction, input_summary,
+                               question=question, interpretation=interpretation, error=ai_error),
+            ensure_ascii=False, indent=2))
+    elif interpretation is not None:
+        console.print(Panel(Text(interpretation), title='AI三传解读', border_style='magenta'))
+
+    if ai_error is not None:
+        error_console.print(f'[bold red]AI解读失败：{ai_error}[/bold red]')
+        return EXIT_AI_ERROR
     return EXIT_SUCCESS
 
 
@@ -566,11 +626,16 @@ def main(argv=None):
         error_console.print('[bold red]参数错误：--time 只能与 --date 一起使用。[/bold red]')
         return EXIT_USAGE_ERROR
     if args.numbers is None and args.date is None and args.chars is None:
-        if args.as_json:
-            error_console.print('[bold red]参数错误：--json 需要与 --numbers、--date 或 --chars 之一一起使用。[/bold red]')
+        if args.as_json or args.question is not None or args.model is not None:
+            error_console.print(
+                '[bold red]参数错误：--json、--question 和 --model 需要与 --numbers、--date 或 --chars 之一一起使用。[/bold red]'
+            )
             return EXIT_USAGE_ERROR
         interactive_main()
         return EXIT_SUCCESS
+    if args.model is not None and args.model not in SUPPORTED_MODELS_BY_VALUE:
+        error_console.print('[bold red]参数错误：--model 只支持 openai:gpt-5.6、deepseek:deepseek-flash。[/bold red]')
+        return EXIT_USAGE_ERROR
     return run_batch(args)
 
 
