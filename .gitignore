@@ -11,3 +11,7 @@ wheels/
 
 # API keys
 .env
+# sssf runtime
+adws/adw_data/sessions/
+adws/adw_data/sssf.db*
+*.pyc
