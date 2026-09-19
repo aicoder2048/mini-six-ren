@@ -201,7 +201,7 @@ def bazi_calculation():
                 ("八字五行", ' '.join([f"{get_wuxing(bazi[p])[0]}{get_wuxing(bazi[p])[1]}" for p in ['year', 'month', 'day', 'time']]))
             ]),
             ("五行分析", [
-                ("五行个", ' '.join([f"{count}个{element}" for element, count in wuxing_analysis['wuxing_count'].items()])),
+                ("五行个数", ' '.join([f"{count}个{element}" for element, count in wuxing_analysis['wuxing_count'].items()])),
                 ("帮扶日主", ''.join(wuxing_analysis['helping_wuxing'])),
                 ("克泄耗日主", ''.join(wuxing_analysis['weakening_wuxing'])),
                 ("五行是否所缺", '五行俱全' if not wuxing_analysis['missing'] else f"缺{''.join(wuxing_analysis['missing'])}"),
