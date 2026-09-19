@@ -172,6 +172,14 @@ class ReviewRegressions(unittest.TestCase):
 
 
 class WebRegressions(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        loop_patch = patch('nicegui.core.loop', asyncio.get_running_loop())
+        loop_patch.start()
+        self.addCleanup(loop_patch.stop)
+        network_patch = patch('pydantic_ai.models.ALLOW_MODEL_REQUESTS', False)
+        network_patch.start()
+        self.addCleanup(network_patch.stop)
+
     async def test_cli_stream_does_not_clear_local_prediction(self):
         from contextlib import asynccontextmanager
         from types import SimpleNamespace
@@ -256,7 +264,7 @@ class WebRegressions(unittest.IsolatedAsyncioTestCase):
         from web import create_page
         entered, release = asyncio.Event(), asyncio.Event()
 
-        async def failing_ai(*args):
+        async def failing_ai(*args, **kwargs):
             entered.set()
             await release.wait()
             raise RuntimeError('simulated outage')
@@ -298,18 +306,176 @@ class WebRegressions(unittest.IsolatedAsyncioTestCase):
     async def test_blank_question_and_local_selection_skip_ai(self):
         from nicegui import Client, ui
         from ai_agent import SupportedModels
-        from types import SimpleNamespace
         from web import create_page
         with patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT56]), \
              patch('web.DivinationAgent.interpret_prediction_async', new_callable=AsyncMock) as ai:
             with Client(ui.page('/skip-ai'), request=None):
                 app = create_page()
                 await app._perform_divination()
-                app._on_model_change(SimpleNamespace(value='local'))
+                app.model_select.value = 'local'
                 app.question_input.value = 'ignored in local mode'
                 await app._perform_divination()
                 ai.assert_not_called()
                 self.assertEqual(app.divination_result, HandTechnique.predict(1, 2, 3))
+
+
+    async def test_form_summary_edit_and_validation_state(self):
+        from nicegui import Client, ui
+        from web import create_page
+        question = '求职问题 "<&>" ' * 30
+        with patch('web.DivinationAgent.get_available_models', return_value=[]):
+            with Client(ui.page('/summary'), request=None):
+                app = create_page()
+                self.assertNotIn('form-collapsed', app.form_card.classes)
+                self.assertEqual(app.edit_button._props['aria-expanded'], 'true')
+                app.question_input.value = question
+                await app._perform_divination()
+                self.assertIn('form-collapsed', app.form_card.classes)
+                self.assertIn('1、2、3', app.summary_label.text)
+                self.assertIn('仅本地', app.summary_label.text)
+                self.assertIn(question.strip(), app.summary_label._props['aria-label'])
+                self.assertEqual(app.summary_label.text, app.summary_label._props['title'])
+                self.assertEqual(app.edit_button._props['aria-expanded'], 'false')
+                details, fields = app.form_details, list(app.number_inputs)
+                result = app.divination_result
+                handler = next(event.handler for event in app.edit_button._event_listeners.values() if event.type == 'click')
+                handler(None)
+                self.assertNotIn('form-collapsed', app.form_card.classes)
+                self.assertEqual(app.edit_button._props['aria-expanded'], 'true')
+                self.assertEqual(app.edit_button._props['aria-controls'], f'c{details.id}')
+                self.assertEqual(app.question_input.value, question)
+                self.assertEqual(app.number_inputs, fields)
+                self.assertIs(app.divination_result, result)
+                await app._perform_divination()
+                self.assertIn('form-collapsed', app.form_card.classes)
+                app.number_inputs[0].value = 0
+                await app._perform_divination()
+                self.assertNotIn('form-collapsed', app.form_card.classes)
+                self.assertFalse(app.ai_action.enabled)
+        css = (Path(__file__).resolve().parents[1] / 'src/web.css').read_text()
+        self.assertIn('.form-summary { display: none;', css)
+        self.assertIn('@media (max-width: 900px) {\n    .form-card.form-collapsed', css)
+        self.assertIn('.form-card.form-collapsed .form-details { display: none; }', css)
+        self.assertIn('.form-card.form-collapsed .form-summary { display: flex; }', css)
+        self.assertIn('text-overflow: ellipsis; white-space: nowrap;', css)
+
+    async def test_result_action_missing_configuration_opens_existing_form(self):
+        from nicegui import Client, ui
+        from ai_agent import SupportedModels
+        from web import create_page
+        for models in [[], [SupportedModels.OPENAI_GPT56]]:
+            with patch('web.DivinationAgent.get_available_models', return_value=models), \
+                 patch('web.DivinationAgent.interpret_prediction_async', new_callable=AsyncMock) as ai:
+                with Client(ui.page('/missing-settings'), request=None):
+                    app = create_page()
+                    await app._perform_divination()
+                    result = app.divination_result
+                    app.optional_panel.value = False
+                    await app._request_ai_interpretation()
+                    self.assertIn('问题' if models else 'API 密钥', app.error_message.text)
+                    self.assertNotIn('form-collapsed', app.form_card.classes)
+                    self.assertTrue(app.optional_panel.value)
+                    app.model_select.value = 'local'
+                    app.question_input.value = '已有问题'
+                    await app._request_ai_interpretation()
+                    self.assertIn('AI 模型', app.error_message.text)
+                    self.assertIs(app.divination_result, result)
+                    self.assertTrue(app.ai_action.enabled)
+                    ai.assert_not_awaited()
+
+    async def test_partial_failure_preserves_local_tree_and_allows_explicit_retry(self):
+        from nicegui import Client, ui
+        from ai_agent import SupportedModels
+        from web import create_page
+        entered, release = asyncio.Event(), asyncio.Event()
+
+        async def partial_failure(*args, on_update):
+            await on_update('### 一句话判断\n未完成')
+            entered.set()
+            await release.wait()
+            raise RuntimeError('断流')
+
+        with patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT56]), \
+             patch('web.DivinationAgent.__init__', return_value=None), \
+             patch('web.DivinationAgent.interpret_prediction_async', new_callable=AsyncMock) as ai:
+            with Client(ui.page('/partial-failure'), request=None):
+                app = create_page()
+                await app._perform_divination()
+                app.question_input.value = '旧问题'
+                ai.return_value = '上次成功'
+                await app._request_ai_interpretation()
+                self.assertEqual(app.ai_interpretation, '上次成功')
+                ai.side_effect = partial_failure
+                app.question_input.value = '本次问题'
+                result, children = app.divination_result, list(app.result_area.default_slot.children)
+                task = asyncio.create_task(app._request_ai_interpretation())
+                await asyncio.wait_for(entered.wait(), 2)
+                self.assertIsNone(app.ai_interpretation)
+                self.assertIn('未完成', app.ai_markdown.content)
+                self.assertFalse(app.submit_button.enabled)
+                self.assertFalse(app.ai_action.enabled)
+                app.question_input.value = '尚未提交的修改'
+                app.model_select.value = 'local'
+                self.assertIn('本次问题', app.ai_request_label.text)
+                self.assertNotIn('尚未提交', app.summary_label.text)
+                await app._perform_divination()
+                await app._request_ai_interpretation()
+                self.assertEqual(ai.await_count, 2)
+                release.set()
+                await task
+                self.assertIs(app.divination_result, result)
+                self.assertEqual(children, app.result_area.default_slot.children)
+                self.assertIn('本地结果已保留', app.ai_status.text)
+                self.assertIn('断流', app.ai_status.text)
+                self.assertEqual(app.ai_status._props['role'], 'alert')
+                self.assertEqual(app.ai_markdown.content, '')
+                self.assertIsNone(app.ai_interpretation)
+                self.assertIn('form-collapsed', app.form_card.classes)
+                self.assertTrue(app.submit_button.enabled)
+                self.assertTrue(app.ai_action.enabled)
+                ai.side_effect, ai.return_value = None, '重试全文（无标题）'
+                app.model_select.value = SupportedModels.OPENAI_GPT56.value
+                await app._request_ai_interpretation()
+                self.assertEqual(app.ai_markdown.content, '重试全文（无标题）')
+                self.assertEqual(app.ai_interpretation, app.ai_markdown.content)
+                self.assertNotIn('ai-failed', app.ai_card.classes)
+                self.assertEqual(app.error_message.text, '')
+
+    async def test_two_clients_stream_and_edit_independently(self):
+        from nicegui import Client, ui
+        from ai_agent import SupportedModels
+        from web import create_page
+        entered = {key: asyncio.Event() for key in ('甲', '乙')}
+        release = {key: asyncio.Event() for key in ('甲', '乙')}
+
+        async def stream(symbols, question, *, on_update):
+            await on_update(question + '的首片')
+            entered[question].set()
+            await release[question].wait()
+            return question + '的全文'
+
+        with patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT56]), \
+             patch('web.DivinationAgent.__init__', return_value=None), \
+             patch('web.DivinationAgent.interpret_prediction_async', side_effect=stream):
+            clients, apps, tasks = {}, {}, {}
+            for key in ('甲', '乙'):
+                clients[key] = Client(ui.page('/isolated-' + key), request=None)
+                with clients[key]:
+                    apps[key] = create_page()
+                    apps[key].question_input.value = key
+                    tasks[key] = asyncio.create_task(apps[key]._perform_divination())
+            for event in entered.values():
+                await asyncio.wait_for(event.wait(), 2)
+            with clients['甲']:
+                apps['甲']._edit_inputs()
+            self.assertNotIn('form-collapsed', apps['甲'].form_card.classes)
+            self.assertIn('form-collapsed', apps['乙'].form_card.classes)
+            for key in ('甲', '乙'):
+                self.assertIn(key + '的首片', apps[key].ai_markdown.content)
+                self.assertIs(apps[key].ai_markdown.client, clients[key])
+                release[key].set()
+                await tasks[key]
+                self.assertEqual(apps[key].ai_interpretation, key + '的全文')
 
 
 if __name__ == '__main__':

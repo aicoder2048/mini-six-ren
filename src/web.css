@@ -255,3 +255,22 @@ html.msr-theme-fade body, html.msr-theme-fade body *, html.msr-theme-fade body *
     *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     .palace-ring-block, .palace-ring-block *, .palace-ring-block::before, .palace-ring-block::after, .palace-ring-block *::before, .palace-ring-block *::after { animation: none !important; transition: none !important; }
 }
+
+/* 结果区直达入口与窄屏输入摘要；桌面始终保留原表单。 */
+.form-details { width: 100%; min-width: 0; gap: 14px; }
+.form-summary { display: none; width: 100%; min-width: 0; align-items: center; flex-wrap: nowrap; gap: 10px; color: var(--ink); }
+.form-summary-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.ai-action-button, .edit-inputs-button { min-height: 44px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 6px; color: var(--accent) !important; background: #f5f0e6 !important; font-size: 12px; }
+.ai-action-button:disabled, .edit-inputs-button:disabled { opacity: .5 !important; }
+.ai-action-button:focus-visible, .edit-inputs-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.reading-heading { flex-wrap: wrap; }
+.form-card, .reading-panel, .ai-result-area { scroll-margin-top: 16px; }
+.ai-card[aria-busy="true"] { border-color: var(--accent); }
+.ai-status { color: var(--muted); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.ai-failed .ai-status { color: #a4342d; }
+.ai-failed { border-left: 3px solid #a4342d; }
+@media (max-width: 900px) {
+    .form-card.form-collapsed { padding: 10px 16px; }
+    .form-card.form-collapsed .form-details { display: none; }
+    .form-card.form-collapsed .form-summary { display: flex; }
+}

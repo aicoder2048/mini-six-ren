@@ -15,7 +15,7 @@ from uuid import uuid4
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from nicegui import ui
+from nicegui import core, ui
 from nicegui.events import ValueChangeEventArguments
 
 from hand_technique import HandTechnique
@@ -185,12 +185,31 @@ THEMES = (
 )
 DEFAULT_THEME = THEMES[0]
 
+AI_SECTION_TITLES = ('一句话判断', '初传｜起点', '中传｜过程', '末传｜趋势', '行动建议')
+
+
+def project_streaming_interpretation(text: str) -> str:
+    """保留累计正文（含未完整分片），只补尚未到达的完整标题；不用于最终结果。"""
+    arrived = set(re.findall(r'^### ([^\n]+?)[ \t]*$', text, flags=re.MULTILINE))
+    missing = [f'### {title}' for title in AI_SECTION_TITLES if title not in arrived]
+    return '\n\n'.join(([text] if text else []) + missing)
+
 
 class DivinationWebApp:
     def __init__(self):
         self.current_model = None
         self.is_running = False
         self.submit_button = None
+        self.ai_action = None
+        self.ai_card = None
+        self.ai_markdown = None
+        self.ai_status = None
+        self.ai_request_label = None
+        self.form_card = None
+        self.form_details = None
+        self.summary_label = None
+        self.edit_button = None
+        self.reading_panel = None
         self.available_models = []
         self.divination_result = None
         self.ai_interpretation = None
@@ -237,13 +256,15 @@ class DivinationWebApp:
     async def _perform_divination(self):
         if self.is_running:
             return
-        self.is_running = True
-        self.submit_button.disable()
+        self._set_running(True)
+        self._set_form_collapsed(False)
         self.submit_button.set_text('正在计算…')
         self.status_message.set_text('正在计算本地三传…')
         try:
             self.result_area.clear()
             self.ai_result_area.clear()
+            self.ai_card = self.ai_markdown = self.ai_status = self.ai_request_label = None
+            self.ai_action.set_text('生成 AI 解读')
             self.error_message.set_text('')
             self.divination_result = None
             self.ai_interpretation = None
@@ -273,31 +294,118 @@ class DivinationWebApp:
             result = HandTechnique.predict(*numbers)
             self.divination_result = result
             self._display_results(result.symbols, result.relations, None)
-            self.status_message.set_text('本地三传已完成。选择AI并填写问题，可再次提交获取解读。')
+            self._collapse_form(question, model)
+            self.status_message.set_text('本地三传已完成。选择AI并填写问题，可在结果区生成解读。')
             if model is not None and question:
-                model_name = SupportedModels.get_display_name(model)
-                self.submit_button.set_text('正在解读…')
-                self.status_message.set_text(f'本地三传已完成，正在等待 {model_name} 解读…')
-                with self.ai_result_area:
-                    with ui.row().classes('items-center gap-3'):
-                        ui.spinner('dots').props('color=primary')
-                        ui.label('本地三传已呈现，AI将结合您的问题解读。')
-                await asyncio.sleep(0)
-                interpretation = await DivinationAgent(model).interpret_prediction_async(result.symbols, question)
-                self.ai_interpretation = interpretation
-                self.ai_result_area.clear()
-                self._display_ai_result(interpretation)
-                self.status_message.set_text('三传与AI解读已完成。修改输入后可再次提交。')
-        except Exception as exc:
-            self.ai_result_area.clear()
-            if self.divination_result is not None:
-                self._show_error(f'AI解读失败：{exc}。本地结果已保留，可再次提交重试。')
+                await self._run_ai_interpretation(result, question, model)
             else:
-                self._show_error(f'计算失败：{exc}')
+                self._scroll_to(self.reading_panel)
+        except Exception as exc:
+            self._show_error(f'计算失败：{exc}')
         finally:
-            self.is_running = False
+            self._set_running(False)
+
+    def _set_running(self, running):
+        self.is_running = running
+        self.submit_button.set_enabled(not running)
+        self.ai_action.set_enabled(not running and self.divination_result is not None)
+        if not running:
             self.submit_button.set_text('开始占卜')
-            self.submit_button.enable()
+
+    async def _request_ai_interpretation(self):
+        if self.is_running or self.divination_result is None:
+            return
+        # 捕获当前问题/模型和既有起课结果，不重算未提交的数字。
+        result = self.divination_result
+        question = (self.question_input.value or '').strip()
+        model = self.current_model
+        if model is None or not question:
+            message = ('未配置可用 AI 模型，请先配置 API 密钥并刷新页面。' if not self.available_models
+                       else '请选择 AI 模型。' if model is None else '请填写想了解的具体问题。')
+            self.error_message.set_text(message)
+            self.status_message.set_text('本地结果已保留，请补充解读设置。')
+            self.optional_panel.set_value(True)
+            self._edit_inputs()
+            return
+        self._set_running(True)
+        try:
+            self._collapse_form(question, model)
+            await self._run_ai_interpretation(result, question, model)
+        finally:
+            self._set_running(False)
+
+    async def _run_ai_interpretation(self, result, question, model):
+        self.error_message.set_text('')
+        self.ai_interpretation = None
+        self.ai_action.set_text('生成 AI 解读')
+        self.submit_button.set_text('正在解读…')
+        model_name = SupportedModels.get_display_name(model)
+        self.status_message.set_text(f'本地三传已完成，{model_name} 正在生成解读…')
+        self._display_ai_result(project_streaming_interpretation(''))
+        self.ai_card.props('aria-busy=true')
+        self.ai_status.set_text('正在生成…')
+        self.ai_request_label.set_text(f'本次解读：{question} · {model_name}')
+        self._scroll_to(self.ai_result_area)
+
+        async def on_update(snapshot):
+            self.ai_markdown.set_content(project_streaming_interpretation(snapshot))
+            # 将本次更新交给 NiceGUI outbox；不等待浏览器回执。
+            await asyncio.sleep(0)
+
+        try:
+            await asyncio.sleep(0)
+            interpretation = await DivinationAgent(model).interpret_prediction_async(
+                result.symbols, question, on_update=on_update)
+            self.ai_markdown.set_content(interpretation)
+            self.ai_interpretation = interpretation
+            self.ai_status.set_text('解读完成')
+            self.ai_action.set_text('重新解读')
+            self.status_message.set_text('三传与AI解读已完成。修改输入后可再次提交。')
+        except Exception as exc:
+            self.ai_markdown.set_content('')
+            message = f'AI解读失败：{exc}。本地结果已保留，可重新解读。'
+            self.ai_card.classes('ai-failed')
+            self.ai_status.props('role=alert aria-live=assertive')
+            self.ai_status.set_text(message)
+            self._show_error(message)
+        finally:
+            self.ai_card.props('aria-busy=false')
+
+    def _set_form_collapsed(self, collapsed):
+        self.form_card.classes(add='form-collapsed' if collapsed else '',
+                               remove='' if collapsed else 'form-collapsed')
+        self.edit_button.props(f'aria-expanded={str(not collapsed).lower()}')
+
+    def _collapse_form(self, question, model):
+        model_name = SupportedModels.get_display_name(model) if model else '仅本地'
+        summary = f'{self.input_summary} · {question or "未填写问题"} · {model_name}'
+        self.summary_label.set_text(summary)
+        # 属性字典避免将用户文本拼接进 props 的解析语法。
+        self.summary_label._props['title'] = summary
+        self.summary_label._props['aria-label'] = summary
+        self.summary_label.update()
+        self._set_form_collapsed(True)
+
+    def _edit_inputs(self):
+        self._set_form_collapsed(False)
+        self._scroll_to(self.form_card)
+
+    @staticmethod
+    def _scroll_to(element):
+        # 非阻塞增强：定位失败不能影响本地结果或模型请求。
+        if core.loop is None or not core.loop.is_running():
+            return
+        try:
+            ui.run_javascript(f"""
+                requestAnimationFrame(() => requestAnimationFrame(() => {{
+                    const target = document.getElementById('c{element.id}');
+                    if (!target) return;
+                    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                    target.scrollIntoView({{block: 'start', behavior: reduced ? 'instant' : 'smooth'}});
+                }}));
+            """)
+        except Exception:
+            pass
 
     def _display_results(self, symbols, relations, ai_result):
         self.result_area.clear()
@@ -423,11 +531,13 @@ class DivinationWebApp:
             return
         self.ai_result_area.clear()
         with self.ai_result_area:
-            with ui.card().classes('ai-card'):
+            with ui.card().classes('ai-card').props('aria-busy=false') as self.ai_card:
                 with ui.row().classes('items-center gap-2'):
                     ui.icon('auto_awesome').classes('accent-text')
                     ui.label('AI 三传解读').classes('serif text-xl')
-                ui.markdown(ai_result).classes('ai-interpretation w-full')
+                self.ai_request_label = ui.label('').classes('helper-text')
+                self.ai_status = ui.label('').classes('ai-status').props('role=status aria-live=polite')
+                self.ai_markdown = ui.markdown(ai_result).classes('ai-interpretation w-full')
 
     def _display_empty_state(self):
         with self.result_area:
@@ -447,6 +557,8 @@ class DivinationWebApp:
                     ui.label('一事一问，让思绪有迹可循')
 
     def _show_error(self, message: str):
+        if self.divination_result is None:
+            self._set_form_collapsed(False)
         self.error_message.set_text(message)
         self.status_message.set_text('解读失败，本地结果仍可查看。' if self.divination_result is not None else '未能计算，请检查输入。')
 
@@ -486,7 +598,7 @@ class DivinationWebApp:
             for title, copy in [
                 ('01 · 选择起课方式', '输入三个 1–999 的整数、一个北京时间，或三个汉字。三种方式任选其一。'),
                 ('02 · 点「开始占卜」', '本地立即呈现三传：初传看起点，中传看过程，末传看趋势。结合两段五行关系阅读，文化背景可按需展开。'),
-                ('03 · 心中所问（选填）', '展开「心中所问 · 解读方式」，填写问题并选择可用的 AI 模型，再次点「开始占卜」即可获得针对性解读。'),
+                ('03 · 心中所问（选填）', '展开「心中所问 · 解读方式」，填写问题并选择可用的 AI 模型，在结果区点「生成 AI 解读 / 重新解读」，即可实时阅读解读；也可再次点「开始占卜」。'),
             ]:
                 ui.label(title).classes('font-semibold mt-3')
                 ui.label(copy).classes('helper-text')
@@ -517,57 +629,64 @@ class DivinationWebApp:
                         ui.label('起点 / 过程 / 趋势').classes('hero-aside-copy')
 
                 with ui.element('div').classes('workspace'):
-                    with ui.card().classes('form-card'):
-                        with ui.row().classes('section-heading'):
-                            ui.label('起一课').classes('serif panel-title')
-                            ui.badge('三种方式 · 任选其一', color=None).classes('quiet-badge')
-                        with ui.tabs().classes('input-tabs').props('dense no-caps align=justify') as tabs:
-                            ui.tab('numbers', label='数字', icon='pin')
-                            ui.tab('date', label='时间', icon='schedule')
-                            ui.tab('chinese', label='汉字', icon='translate')
-                        with ui.tab_panels(tabs, value='numbers').classes('input-panels'):
-                            with ui.tab_panel('numbers'):
-                                ui.label('心中默想，输入三个 1–999 的整数。').classes('helper-text input-hint')
-                                with ui.element('div').classes('input-grid'):
-                                    self.number_inputs = [
-                                        ui.number(label=label, value=i + 1, min=1, max=999, step=1).classes('w-full').props('outlined hide-bottom-space')
-                                        for i, label in enumerate(('初数', '中数', '末数'))
-                                    ]
-                            with ui.tab_panel('date'):
-                                ui.label('以所选时刻的农历月、日、时辰起课。').classes('helper-text input-hint')
-                                with ui.element('div').classes('date-grid'):
-                                    self.date_input = ui.input('公历日期', value=now.strftime('%Y-%m-%d')).classes('w-full').props('type=date outlined hide-bottom-space min=1900-01-01 max=2099-12-31')
-                                    self.time_input = ui.input('北京时间', value=now.strftime('%H:%M')).classes('w-full').props('type=time outlined hide-bottom-space')
-                                ui.label('按北京时间 UTC+8；闰月沿用同名月份，23点按当日农历日取数。').classes('helper-text mt-3')
-                            with ui.tab_panel('chinese'):
-                                ui.label('让心中想到的三个字，成为起点。').classes('helper-text input-hint')
-                                self.chinese_input = ui.input('三个汉字', placeholder='例如：天行健、中国人').classes('w-full').props('outlined hide-bottom-space')
-                                ui.label('按内置字典笔画取数，支持逗号或空格分隔。').classes('helper-text mt-3')
-                        self.input_tabs = tabs
-                        self.error_message = ui.label('').classes('error-message').props('role=alert')
-                        self.submit_button = ui.button('开始占卜', icon='auto_awesome', on_click=self._perform_divination).classes('submit-button').props('unelevated no-caps')
-                        self.status_message = ui.label('准备就绪：填写输入后开始占卜。').classes('status-message').props('role=status aria-live=polite')
-                        # 选填区：配置了 AI 时默认展开，否则收起，让主按钮留在首屏。
-                        caption = '选填 · 填写问题后可获得 AI 解读' if self.available_models else '选填 · 留空只看三传，本地无需 AI'
-                        self.optional_panel = ui.expansion('心中所问 · 解读方式', caption=caption, icon='edit_note', value=bool(self.available_models)).classes('optional-panel')
-                        with self.optional_panel:
-                            self.question_input = ui.textarea('想了解的具体问题', placeholder='例如：准备换工作，接下来应先做好哪些准备？').classes('question-field w-full').props('outlined autogrow rows=2 hide-bottom-space')
-                            model_options = {'local': '仅本地计算（不使用AI）'}
-                            model_options.update({model.value: SupportedModels.get_display_name(model) for model in self.available_models})
-                            self.model_select = ui.select(model_options, label='解读方式', value=self.current_model.value if self.current_model else 'local', on_change=self._on_model_change).classes('w-full').props('outlined hide-bottom-space')
-                            if not self.available_models:
-                                with ui.row().classes('local-note'):
-                                    ui.icon('check_circle_outline', size='16px')
-                                    ui.label('本地即可查看完整三传，无需 AI。')
-                            else:
-                                ui.label('选择 AI 并填写问题后生成解读；问题留空则只计算三传。').classes('helper-text')
+                    with ui.card().classes('form-card') as self.form_card:
+                        with ui.row().classes('form-summary'):
+                            self.summary_label = ui.label('').classes('form-summary-text')
+                            self.edit_button = ui.button('修改', on_click=self._edit_inputs).props('flat no-caps aria-expanded=true').classes('edit-inputs-button')
+                        with ui.column().classes('form-details') as self.form_details:
+                            with ui.row().classes('section-heading'):
+                                ui.label('起一课').classes('serif panel-title')
+                                ui.badge('三种方式 · 任选其一', color=None).classes('quiet-badge')
+                            with ui.tabs().classes('input-tabs').props('dense no-caps align=justify') as tabs:
+                                ui.tab('numbers', label='数字', icon='pin')
+                                ui.tab('date', label='时间', icon='schedule')
+                                ui.tab('chinese', label='汉字', icon='translate')
+                            with ui.tab_panels(tabs, value='numbers').classes('input-panels'):
+                                with ui.tab_panel('numbers'):
+                                    ui.label('心中默想，输入三个 1–999 的整数。').classes('helper-text input-hint')
+                                    with ui.element('div').classes('input-grid'):
+                                        self.number_inputs = [
+                                            ui.number(label=label, value=i + 1, min=1, max=999, step=1).classes('w-full').props('outlined hide-bottom-space')
+                                            for i, label in enumerate(('初数', '中数', '末数'))
+                                        ]
+                                with ui.tab_panel('date'):
+                                    ui.label('以所选时刻的农历月、日、时辰起课。').classes('helper-text input-hint')
+                                    with ui.element('div').classes('date-grid'):
+                                        self.date_input = ui.input('公历日期', value=now.strftime('%Y-%m-%d')).classes('w-full').props('type=date outlined hide-bottom-space min=1900-01-01 max=2099-12-31')
+                                        self.time_input = ui.input('北京时间', value=now.strftime('%H:%M')).classes('w-full').props('type=time outlined hide-bottom-space')
+                                    ui.label('按北京时间 UTC+8；闰月沿用同名月份，23点按当日农历日取数。').classes('helper-text mt-3')
+                                with ui.tab_panel('chinese'):
+                                    ui.label('让心中想到的三个字，成为起点。').classes('helper-text input-hint')
+                                    self.chinese_input = ui.input('三个汉字', placeholder='例如：天行健、中国人').classes('w-full').props('outlined hide-bottom-space')
+                                    ui.label('按内置字典笔画取数，支持逗号或空格分隔。').classes('helper-text mt-3')
+                            self.input_tabs = tabs
+                            self.error_message = ui.label('').classes('error-message').props('role=alert')
+                            self.submit_button = ui.button('开始占卜', icon='auto_awesome', on_click=self._perform_divination).classes('submit-button').props('unelevated no-caps')
+                            self.status_message = ui.label('准备就绪：填写输入后开始占卜。').classes('status-message').props('role=status aria-live=polite')
+                            # 选填区：配置了 AI 时默认展开，否则收起，让主按钮留在首屏。
+                            caption = '选填 · 填写问题后可获得 AI 解读' if self.available_models else '选填 · 留空只看三传，本地无需 AI'
+                            self.optional_panel = ui.expansion('心中所问 · 解读方式', caption=caption, icon='edit_note', value=bool(self.available_models)).classes('optional-panel')
+                            with self.optional_panel:
+                                self.question_input = ui.textarea('想了解的具体问题', placeholder='例如：准备换工作，接下来应先做好哪些准备？').classes('question-field w-full').props('outlined autogrow rows=2 hide-bottom-space')
+                                model_options = {'local': '仅本地计算（不使用AI）'}
+                                model_options.update({model.value: SupportedModels.get_display_name(model) for model in self.available_models})
+                                self.model_select = ui.select(model_options, label='解读方式', value=self.current_model.value if self.current_model else 'local', on_change=self._on_model_change).classes('w-full').props('outlined hide-bottom-space')
+                                if not self.available_models:
+                                    with ui.row().classes('local-note'):
+                                        ui.icon('check_circle_outline', size='16px')
+                                        ui.label('本地即可查看完整三传，无需 AI。')
+                                else:
+                                    ui.label('选择 AI 并填写问题后生成解读；问题留空则只计算三传。').classes('helper-text')
+                        self.edit_button.props(f'aria-controls=c{self.form_details.id}')
 
-                    with ui.element('section').classes('reading-panel').props('aria-label=三传结果'):
+                    with ui.element('section').classes('reading-panel').props('aria-label=三传结果') as self.reading_panel:
                         with ui.row().classes('reading-heading'):
                             with ui.row().classes('items-center gap-2'):
                                 ui.icon('auto_stories', size='19px')
                                 ui.label('三传观照').classes('reading-heading-title')
                             ui.label('由始而终，循序而观').classes('reading-heading-note')
+                            self.ai_action = ui.button('生成 AI 解读', icon='auto_awesome', on_click=self._request_ai_interpretation).props('flat no-caps').classes('ai-action-button')
+                            self.ai_action.disable()
                         self.result_area = ui.column().classes('result-area')
                         self._display_empty_state()
                         self.ai_result_area = ui.column().classes('ai-result-area')

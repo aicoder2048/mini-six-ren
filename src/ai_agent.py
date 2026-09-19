@@ -1,6 +1,7 @@
 import os
 import json
 from dataclasses import dataclass
+from collections.abc import Awaitable, Callable
 from dotenv import load_dotenv
 from pydantic_ai import Agent
 import re
@@ -142,7 +143,10 @@ class DivinationAgent:
             model_name = SupportedModels.get_display_name(self.model_type)
             raise RuntimeError(f"{model_name}解读出错：{e}") from e
     
-    async def interpret_prediction_async(self, symbols, question: str) -> str:
+    async def interpret_prediction_async(
+        self, symbols, question: str, *,
+        on_update: Callable[[str], Awaitable[None]] | None = None,
+    ) -> str:
         """
         异步版本的AI解读方法，用于Web界面
         
@@ -165,7 +169,7 @@ class DivinationAgent:
         
         try:
             # 直接调用异步流式响应方法
-            return await self._stream_interpretation_web(prompt, deps)
+            return await self._stream_interpretation_web(prompt, deps, on_update=on_update)
             
         except Exception as e:
             model_name = SupportedModels.get_display_name(self.model_type)
@@ -202,8 +206,11 @@ class DivinationAgent:
         
         return self._format_markdown_for_web(full_response)
     
-    async def _stream_interpretation_web(self, prompt: str, deps: DivinationDeps) -> str:
-        """异步流式处理AI解读 - Web版本（无控制台输出）"""
+    async def _stream_interpretation_web(
+        self, prompt: str, deps: DivinationDeps, *,
+        on_update: Callable[[str], Awaitable[None]] | None = None,
+    ) -> str:
+        """Web 流式解读：顺序回调累计 Markdown 快照，返回权威全文，无控制台输出。"""
         full_response = ""
         
         try:
@@ -212,8 +219,10 @@ class DivinationAgent:
                 deps=deps,
                 model_settings={'max_tokens': INTERPRETATION_MAX_TOKENS}
             ) as result:
-                async for message in result.stream_text():
+                async for message in result.stream_text(delta=False, debounce_by=None):
                     full_response = message
+                    if on_update is not None:
+                        await on_update(self._format_markdown_for_web(full_response))
                 
         except Exception:
             raise

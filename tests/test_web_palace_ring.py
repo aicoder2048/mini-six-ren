@@ -459,7 +459,7 @@ class PalaceRingPage(unittest.IsolatedAsyncioTestCase):
         from web import create_page
         entered, release = asyncio.Event(), asyncio.Event()
 
-        async def failing_ai(*args):
+        async def failing_ai(*args, **kwargs):
             entered.set()
             await release.wait()
             raise RuntimeError('simulated outage')

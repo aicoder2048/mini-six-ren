@@ -99,3 +99,9 @@ html[data-theme="ink"] .palace-relation-title { color: var(--accent); }
     html[data-theme="ink"] .hero-title { letter-spacing: 3px; }
     html[data-theme="ink"] .form-card { box-shadow: 4px 4px 0 var(--ink); }
 }
+/* 实时解读入口：朱文与墨线，保留摘要的响应式显示契约。 */
+html[data-theme="ink"] .ai-action-button, html[data-theme="ink"] .edit-inputs-button { background: transparent !important; color: var(--accent) !important; border-color: var(--ink); border-radius: 0; }
+html[data-theme="ink"] .form-summary { color: var(--ink); font-family: var(--sans); }
+html[data-theme="ink"] .ai-card[aria-busy="true"] { border-color: var(--accent); }
+html[data-theme="ink"] .ai-failed { border-left-color: var(--accent); }
+html[data-theme="ink"] .ai-failed .ai-status { color: var(--accent); }
