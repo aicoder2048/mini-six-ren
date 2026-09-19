@@ -147,3 +147,14 @@ git diff --check
 禁止修改：12 份太岁 JSON、Web UI、AI prompt、`src/hand_technique.py`、`src/utils/symbol_relations.py`、`data/symbols.json`、日主历史映射、`bagua.py` / `celestial_stems_earthly_branches.py` 清理。无需修改现有八字算法。
 
 Done 条件：全部 unittest 通过；明确覆盖加载形状、参考五类、稀疏年份、年界和多重关系；CLI 新节完整展示；旧八字字段与旧节逐字不变、小六壬输出不变；独立算法复核及阻断项复审通过；规格和实际审查证据都已落盘。最终报告给出验证结果、独立复核结论与数据缺项限制。
+
+## 7. 实施记录
+
+- 实施起始 HEAD：`fa8e83c1eeaff60415e89488bc59acb5c6535aa3`；起始工作树仅有未跟踪的任务输入 `requests/tai-sui-analysis.md`，未修改该文件。
+- 已实现模块级一次加载、两种顶层形状归一、结构校验及点名异常、稀疏年份查找、地支直接关系匹配、多关系返回和北京时间默认年。
+- CLI 在「命运解析」后追加「流年太岁」；`format_bazi_output` 保留六个位置参数与三个旧键，仅增加关键字年份参数及 `tai_sui_info`。未修改八字核心、太岁资料、Web UI、AI prompt 或小六壬逻辑。
+- 修改前捕获三组男女/立春前样例至 `tests/fixtures/tai_sui_bazi_baseline.json`；新测试逐字比较旧字典与移除新增节后的 CLI 输出。
+- 实施验证：新增 16 项测试通过，全套 124 项测试通过；`uv lock --locked`、`git diff --check` 均退出 0。
+- 独立 Spec/算法复核记录：[457fdccf_annual-tai-sui-review.md](../reviews/457fdccf_annual-tai-sui-review.md)。
+- 独立 Standards 复核记录：[457fdccf_annual-tai-sui-standards.md](../reviews/457fdccf_annual-tai-sui-standards.md)。最终门禁结论以两份实际审查记录为准。
+- 最终门禁：两个独立新进程 Reviewer 分别完成 Standards 与 Spec/算法复核，均通过，无阻断项。算法 Reviewer 独立对原 JSON 验证 2,400 个年份/出生支组合、北京时间年界及 9 组 Git 基线旧输出比较；Standards 留下一项非阻断展示测试增强建议 S-01，未扩大本次修改范围。

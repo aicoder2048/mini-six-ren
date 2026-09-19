@@ -1,7 +1,8 @@
 from hand_technique import HandTechnique
 from ai_agent import DivinationAgent, SupportedModels
 from five_elements import FIVE_ELEMENTS
-from utils.calendar_converter import solar_to_lunar, lunar_to_solar, date_to_numbers
+from utils.calendar_converter import solar_to_lunar, lunar_to_solar, date_to_numbers, format_tai_sui_section
+from utils.tai_sui import analyze_tai_sui
 from utils.stroke_count import get_stroke_counts, format_stroke_count_output
 from utils.bazi_calculator import calculate_bazi, analyze_day_master_strength, analyze_spouse_palace, get_chinese_year
 from utils.five_elements_utils import analyze_wuxing, analyze_missing_wuxing, get_wuxing, print_generation_cycle, print_overcoming_cycle, get_supporting_elements, get_weakening_elements
@@ -209,7 +210,8 @@ def bazi_calculation():
             ("命运解析", [
                 ("日主旺衰", day_master_analysis),
                 ("配偶宫位", spouse_palace_analysis)
-            ])
+            ]),
+            ("流年太岁", format_tai_sui_section(analyze_tai_sui(bazi['year'][1])))
         ]
         
         for title, items in sections:

@@ -4,6 +4,7 @@ from lunar_python import Lunar, Solar
 from .validation import parse_datetime, validate_datetime, normalize_gender
 from .bazi_calculator import calculate_bazi, HEAVENLY_STEMS, EARTHLY_BRANCHES, ZODIAC_ANIMALS
 from .five_elements_utils import analyze_wuxing, WUXING, DETAILED_WUXING
+from .tai_sui import analyze_tai_sui
 
 
 def solar_to_lunar(year: int, month: int, day: int) -> Tuple[int, int, int, bool]:
@@ -34,7 +35,7 @@ def date_to_numbers(date_text: str, time_text: str) -> list[int]:
     return [month, day, (value.hour + 1) % 24 // 2 + 1]
 
 
-def format_bazi_output(bazi: Dict[str, str], wuxing_analysis: Dict[str, Any], solar_date: str, solar_time: str, lunar_date: Tuple[int, int, int, bool], gender: str) -> Dict[str, Any]:
+def format_bazi_output(bazi: Dict[str, str], wuxing_analysis: Dict[str, Any], solar_date: str, solar_time: str, lunar_date: Tuple[int, int, int, bool], gender: str, *, target_year: int | None = None) -> Dict[str, Any]:
     zodiac = ZODIAC_ANIMALS[EARTHLY_BRANCHES.index(bazi['year'][1])]
     day_master = bazi['day'][:2]
     day_wuxing = WUXING[day_master[0]]
@@ -68,4 +69,22 @@ def format_bazi_output(bazi: Dict[str, str], wuxing_analysis: Dict[str, Any], so
         }
     }
     
-    return {**basic_info, **bazi_info, **wuxing_info}
+    return {**basic_info, **bazi_info, **wuxing_info,
+            'tai_sui_info': analyze_tai_sui(bazi['year'][1], target_year)}
+
+
+def format_tai_sui_section(result: dict) -> list[tuple[str, str]]:
+    """Build display rows without changing the dataset's original explanations."""
+    rows = [('流年', f"{result['target_year']}年 {result['chinese_year']}（按北京时间公历年）")]
+    if result['general_status'] == 'available':
+        rows.extend([('值年太岁', result['general']), ('说明', result['general_description'])])
+    else:
+        rows.append(('值年太岁', f"数据未收录{result['chinese_year'][:2]}年值年太岁"))
+    rows.append(('关系摘要', result['summary']))
+    for relation in result['fan_tai_sui'] + result['he_tai_sui']:
+        label = relation['relation_type']
+        if relation['subtype']:
+            label += f"（{relation['subtype']}）"
+        rows.append((label, f"{relation['combination']}；{relation['explanation']}"))
+    rows.append(('资料说明', '依据项目太岁资料，仅供传统文化参考；三合关系不代表完整命盘成局。'))
+    return rows
