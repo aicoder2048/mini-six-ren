@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import uuid
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,6 +41,10 @@ def operator_env() -> dict[str, str]:
 
 def new_id(length: int = 8) -> str:
     return secrets.token_hex(length // 2)
+
+
+def new_uuid() -> str:
+    return str(uuid.uuid4())
 
 
 def now_iso() -> str:

@@ -1,5 +1,6 @@
 # sssf.config.yaml — the factory's agent roster. One agent, one prompt, one purpose.
-# v1 runs the Pi coding agent only; coding_agent: claude_code arrives in v2.
+# coding_agent: pi (model resolved against `pi --list-models`) or claude_code
+# (model written as anthropic/<id>, run through `claude -p`; see adw_modules/agent_cc.py).
 defaults:
   coding_agent: pi
   model: deepseek/deepseek-v4-flash   # provider/id — a bare pattern is ambiguous across providers
@@ -82,6 +83,9 @@ agents:
       - write
 
   - name: scout
+    coding_agent: claude_code      # pi | claude_code — runs via `claude -p` (adw_modules/agent_cc.py)
+    model: anthropic/claude-opus-5 # provider/id — Opus 5; claude_code models are always anthropic/<claude model id>
+    thinking: high                 # off | minimal | low | medium | high | xhigh | max -> claude --effort
     color: "#fbbf24"
     purpose: Find and report where things live; change nothing.
     prompt_engineering:
