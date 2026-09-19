@@ -22,13 +22,15 @@ from hand_technique import HandTechnique
 from symbols import SYMBOLS
 from ai_agent import DivinationAgent, SupportedModels
 from utils.stroke_count import get_stroke_counts
-from utils.calendar_converter import date_to_numbers
-from utils.validation import validate_numbers, validate_chinese
+from utils.calendar_converter import date_to_numbers, solar_to_lunar, format_bazi_output, format_tai_sui_section
+from utils.validation import validate_numbers, validate_chinese, parse_datetime, normalize_gender
+from utils.bazi_calculator import calculate_bazi, analyze_day_master_strength, analyze_spouse_palace
+from utils.five_elements_utils import analyze_wuxing, analyze_missing_wuxing
 from utils.symbol_relations import describe_relation
 
 THEME_DIR = Path(__file__).with_name('themes')
 HERO_TITLE = '一念起，观三传。'
-# 五行→CSS 钩子；默认皮肤不使用这些类，仅供主题分色。
+# 五行→CSS 展示钩子；供各页面与皮肤分色，不参与计算。
 ELEMENT_KEYS = {'木': 'wood', '火': 'fire', '土': 'earth', '金': 'metal', '水': 'water'}
 
 # 三传阶段：完整名与环上记号用的简写。
@@ -193,6 +195,15 @@ def project_streaming_interpretation(text: str) -> str:
     arrived = set(re.findall(r'^### ([^\n]+?)[ \t]*$', text, flags=re.MULTILINE))
     missing = [f'### {title}' for title in AI_SECTION_TITLES if title not in arrived]
     return '\n\n'.join(([text] if text else []) + missing)
+
+
+def create_page_nav(current_path):
+    """两页共用纯导航，不保存控制器或 UI 状态。"""
+    with ui.element('nav').classes('page-nav').props('aria-label="测算页面"'):
+        for path, label in (('/', '小六壬'), ('/bazi', '八字')):
+            link = ui.link(label, path).classes('page-nav-link')
+            if path == current_path:
+                link.props('aria-current=page')
 
 
 class DivinationWebApp:
@@ -614,6 +625,7 @@ class DivinationWebApp:
                         ui.label('MINI SIX REN').classes('brand-english')
                 with ui.row().classes('header-actions'):
                     ui.label('传统智慧 · 当下启发').classes('header-tagline')
+                    create_page_nav('/')
                     self._create_theme_switcher()
                     ui.button('使用指南', icon='help_outline', on_click=guide.open).props('flat no-caps').classes('guide-button')
 
@@ -702,6 +714,134 @@ class DivinationWebApp:
                 ui.label('解读用于梳理思路，现实决定仍需事实依据。')
 
 
+class BaziWebApp:
+    """每次页面请求独立持有输入和报告；仅编排共享计算，不实现命理规则。"""
+
+    def __init__(self):
+        self.report = None
+        self.date_input = self.time_input = self.gender_input = self.year_input = None
+        self.submit_button = self.error_message = self.status_message = self.result_area = None
+
+    def _perform_calculation(self):
+        self.report = None
+        self.result_area.clear()
+        self.error_message.set_text('')
+        try:
+            birth = parse_datetime(self.date_input.value, self.time_input.value)
+            gender = normalize_gender(self.gender_input.value)
+            year = self.year_input.value
+            if isinstance(year, bool) or not isinstance(year, int) or not 1900 <= year <= 2099:
+                raise ValueError('流年必须为1900-2099之间的整数')
+            lunar = solar_to_lunar(birth.year, birth.month, birth.day)
+            bazi = calculate_bazi(birth.year, birth.month, birth.day, birth.hour, birth.minute)
+            wuxing = analyze_wuxing(bazi)
+            analysis = [
+                ('日主强弱', analyze_day_master_strength(bazi, gender)),
+                ('配偶宫', analyze_spouse_palace(bazi, gender)),
+                ('缺失影响', analyze_missing_wuxing(wuxing['missing'], gender)),
+            ]
+            formatted = format_bazi_output(bazi, wuxing, birth.strftime('%Y-%m-%d'),
+                                           birth.strftime('%H:%M'), lunar, gender, target_year=year)
+            report = dict(formatted=formatted, bazi=bazi, wuxing=wuxing, analysis=analysis)
+            self._display_report(report)
+            self.report = report
+            self.status_message.set_text(f'本地测算已完成，报告流年：{year}年。')
+        except Exception as exc:
+            self.report = None
+            self.result_area.clear()
+            self.error_message.set_text(str(exc) if isinstance(exc, ValueError) else f'计算失败：{exc}')
+            self.status_message.set_text('未能计算，请检查输入后再次测算。')
+
+    def _display_report(self, report):
+        formatted = report['formatted']
+        sections = [
+            ('basic', '基本信息', [(label, formatted['basic_info'][key]) for label, key in
+                                  [('性别', 'sex'), ('公历生日', 'solar_date'), ('农历生日', 'lunar_date')]]),
+            ('pillars', '八字信息', [(label, formatted['bazi_info'][key]) for label, key in
+                                    [('生辰八字', 'birth_info'), ('命主五行', 'day_master'), ('八字五行', 'bazi_five_elements')]]),
+            ('wuxing', '五行分析', [(label, formatted['wuxing_info'][key]) for label, key in
+                                   [('五行个数', 'wuxing_count'), ('五行是否所缺', 'missing'),
+                                    ('帮扶日主', 'helping_wuxing'), ('克泄耗日主', 'weakening_wuxing'),
+                                    ('缺失影响概要', 'missing_impact')]]),
+            ('analysis', '命运解析', report['analysis']),
+            ('tai-sui', '流年太岁', format_tai_sui_section(formatted['tai_sui_info'])),
+        ]
+        self.result_area.clear()
+        with self.result_area:
+            for section, title, rows in sections:
+                with ui.card().classes('bazi-section').props(f'data-section={section}'):
+                    ui.label(title).classes('serif bazi-section-title').props('role=heading aria-level=2')
+                    if section == 'pillars':
+                        with ui.element('div').classes('bazi-pillars'):
+                            for key, label in [('year', '年柱'), ('month', '月柱'), ('day', '日柱'), ('time', '时柱')]:
+                                with ui.column().classes('bazi-pillar'):
+                                    ui.label(label).classes('helper-text')
+                                    ui.label(report['bazi'][key]).classes('serif')
+                    if section == 'wuxing':
+                        with ui.row().classes('bazi-elements'):
+                            for element, count in report['wuxing']['wuxing_count'].items():
+                                key = ELEMENT_KEYS[element]
+                                ui.badge(f'{element} · {count}', color=None).classes(
+                                    f'bazi-element-badge element-badge element-{key}').props(f'data-element={key}')
+                    for label, value in rows:
+                        with ui.column().classes('bazi-field'):
+                            ui.label(label).classes('bazi-field-label')
+                            ui.label(value).classes('bazi-field-value')
+
+    def create_ui(self):
+        now = datetime.now(timezone(timedelta(hours=8)))
+        ui.colors(primary='#a34432', secondary='#69755e', negative='#b33c32')
+        ui.add_css(Path(__file__).with_name('web.css'))
+        DivinationWebApp._add_theme_assets()
+        with ui.column().classes('app-shell bazi-page'):
+            with ui.element('header').classes('site-header'):
+                with ui.row().classes('brand'):
+                    ui.label('壬').classes('brand-seal serif').props('aria-hidden=true')
+                    with ui.column().classes('brand-wordmark'):
+                        ui.label('小六壬').classes('serif brand-name')
+                        ui.label('MINI SIX REN').classes('brand-english')
+                with ui.row().classes('header-actions'):
+                    create_page_nav('/bazi')
+                    DivinationWebApp._create_theme_switcher()
+            with ui.element('main').classes('page-main'):
+                with ui.element('section').classes('hero'):
+                    with ui.column().classes('hero-copy'):
+                        ui.label('八字测算').classes('serif hero-title').props('role=heading aria-level=1 data-text="八字测算"')
+                        ui.label('四柱 · 五行 · 流年太岁，纯本地测算，无需 AI。').classes('hero-description')
+                with ui.element('div').classes('workspace'):
+                    with ui.card().classes('form-card'):
+                        ui.label('出生信息').classes('serif panel-title')
+                        self.date_input = ui.input('公历出生日期', value=now.strftime('%Y-%m-%d')).classes('w-full').props(
+                            'type=date min=1900-01-01 max=2099-12-31 outlined hide-bottom-space')
+                        self.time_input = ui.input('出生时间', value='00:00').classes('w-full').props(
+                            'type=time step=60 outlined hide-bottom-space')
+                        self.gender_input = ui.select(['男', '女'], label='性别', value='男').classes('w-full').props('outlined hide-bottom-space')
+                        ui.label('按北京时间 UTC+8；公历范围1900–2099，午夜换日，不做真太阳时校正。').classes('helper-text')
+                        self.year_input = ui.select(list(range(1900, 2100)), label='流年（按北京时间公历年）',
+                                                    value=now.year).classes('w-full').props('outlined hide-bottom-space')
+                        ui.label('更换流年后，请再次点击「开始测算」更新报告。').classes('helper-text')
+                        self.error_message = ui.label('').classes('error-message').props('role=alert')
+                        self.submit_button = ui.button('开始测算', on_click=self._perform_calculation).classes('submit-button').props('unelevated no-caps')
+                        self.status_message = ui.label('准备就绪：填写出生信息后开始测算。').classes('status-message').props('role=status aria-live=polite')
+                    with ui.element('section').classes('reading-panel').props('aria-label=八字报告'):
+                        self.result_area = ui.column().classes('result-area')
+                        with self.result_area:
+                            ui.label('填写出生信息，查看八字与流年太岁报告。').classes('helper-text')
+                with ui.element('aside').classes('bazi-disclaimer'):
+                    ui.label('八字后的性格和关系解读仍为原有简化规则；历法计算修正不代表这些解读得到验证。')
+                    ui.label('日主强弱、配偶宫分析属于上述简化规则，仅供传统文化参考。')
+            with ui.element('footer').classes('site-footer'):
+                ui.label('小六壬 · 传统文化探索')
+                ui.label('现实决定仍需事实依据。')
+
+
+def create_bazi_page():
+    """Each page owns its controller and every callback's widget references."""
+    web_app = BaziWebApp()
+    web_app.create_ui()
+    return web_app
+
+
 def create_page():
     """Each page owns its controller and every callback's widget references."""
     web_app = DivinationWebApp()
@@ -713,6 +853,7 @@ def main():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     os.chdir(project_root)
     ui.page('/', dark=False)(create_page)
+    ui.page('/bazi', dark=False)(create_bazi_page)
     ui.run(title='小六壬 · 三传', port=8080, host='0.0.0.0', reload=True, favicon='☯', dark=False)
 
 

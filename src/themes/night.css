@@ -101,3 +101,15 @@ html[data-theme="night"] .form-summary { color: var(--ink); }
 html[data-theme="night"] .ai-card[aria-busy="true"] { border-color: var(--accent); }
 html[data-theme="night"] .ai-failed { border-left-color: #ff8a7a; }
 html[data-theme="night"] .ai-failed .ai-status { color: #ff8a7a; }
+
+/* 八字：星夜报告卡片与导航 */
+html[data-theme="night"] .bazi-section { background: var(--surface); border-color: var(--line); color: var(--ink); }
+html[data-theme="night"] .bazi-section-title { color: var(--gold-soft); }
+html[data-theme="night"] .bazi-pillar { background: var(--surface-2); border-color: var(--line); }
+html[data-theme="night"] .bazi-disclaimer { background: var(--surface-2); color: var(--muted); border-color: var(--accent); }
+html[data-theme="night"] .page-nav-link:hover, html[data-theme="night"] .page-nav-link[aria-current="page"] { background: var(--surface-2); color: var(--gold-soft); }
+html[data-theme="night"] .bazi-element-badge[data-element="wood"] { color: var(--el-wood); }
+html[data-theme="night"] .bazi-element-badge[data-element="fire"] { color: var(--el-fire); }
+html[data-theme="night"] .bazi-element-badge[data-element="earth"] { color: var(--el-earth); }
+html[data-theme="night"] .bazi-element-badge[data-element="metal"] { color: var(--el-metal); }
+html[data-theme="night"] .bazi-element-badge[data-element="water"] { color: var(--el-water); }

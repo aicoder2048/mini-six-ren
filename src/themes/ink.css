@@ -105,3 +105,16 @@ html[data-theme="ink"] .form-summary { color: var(--ink); font-family: var(--san
 html[data-theme="ink"] .ai-card[aria-busy="true"] { border-color: var(--accent); }
 html[data-theme="ink"] .ai-failed { border-left-color: var(--accent); }
 html[data-theme="ink"] .ai-failed .ai-status { color: var(--accent); }
+
+/* 八字：宣纸、墨线与朱文标题 */
+html[data-theme="ink"] .bazi-section { background: #fff; border-color: var(--ink); border-radius: 0; color: var(--ink); }
+html[data-theme="ink"] .bazi-section-title { color: var(--accent); font-weight: 700; }
+html[data-theme="ink"] .bazi-pillar { background: var(--paper); border-color: var(--line); border-radius: 0; }
+html[data-theme="ink"] .bazi-disclaimer { background: transparent; color: var(--muted); border-color: var(--accent); }
+html[data-theme="ink"] .page-nav-link:hover, html[data-theme="ink"] .page-nav-link[aria-current="page"] { background: var(--ink); color: var(--paper); border-radius: 0; }
+html[data-theme="ink"] .bazi-element-badge { border-color: currentColor; }
+html[data-theme="ink"] .bazi-element-badge[data-element="wood"] { color: var(--el-wood); }
+html[data-theme="ink"] .bazi-element-badge[data-element="fire"] { color: var(--el-fire); }
+html[data-theme="ink"] .bazi-element-badge[data-element="earth"] { color: var(--el-earth); }
+html[data-theme="ink"] .bazi-element-badge[data-element="metal"] { color: var(--el-metal); }
+html[data-theme="ink"] .bazi-element-badge[data-element="water"] { color: var(--el-water); }

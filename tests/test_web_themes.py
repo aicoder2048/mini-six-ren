@@ -42,6 +42,23 @@ class ThemeRegistry(unittest.TestCase):
                     for selector in selectors:
                         self.assertTrue(selector.strip().startswith(prefix), f'{theme.id}: {selector.strip()}')
 
+    def test_bazi_style_hooks_in_all_four_skins(self):
+        base = (THEME_DIR.parent / 'web.css').read_text(encoding='utf-8')
+        for hook in ('page-nav', 'page-nav-link', 'bazi-page', 'bazi-section', 'bazi-section-title',
+                     'bazi-field', 'bazi-pillars', 'bazi-pillar', 'bazi-element-badge', 'bazi-disclaimer'):
+            self.assertIn(f'.{hook}', base)
+        self.assertIn('repeat(2, minmax(0, 1fr))', base)
+        for key in ELEMENT_KEYS.values():
+            self.assertIn(f'.bazi-element-badge[data-element="{key}"] {{ color: var(--el-{key}); }}', base)
+        for theme in THEMES[1:]:
+            css = (THEME_DIR / theme.stylesheet).read_text(encoding='utf-8')
+            prefix = f'html[data-theme="{theme.id}"]'
+            with self.subTest(theme=theme.id):
+                for hook in ('bazi-section', 'bazi-section-title', 'bazi-pillar', 'bazi-disclaimer', 'page-nav-link'):
+                    self.assertIn(f'{prefix} .{hook}', css)
+                for key in ELEMENT_KEYS.values():
+                    self.assertIn(f'{prefix} .bazi-element-badge[data-element="{key}"] {{ color: var(--el-{key}); }}', css)
+
     def test_theme_script_is_safe_to_inline_and_exposes_runtime(self):
         script = (THEME_DIR / 'theme.js').read_text(encoding='utf-8')
         self.assertIn('window.msrTheme', script)
