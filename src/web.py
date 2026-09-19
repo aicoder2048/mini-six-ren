@@ -5,11 +5,13 @@ import os
 import re
 import sys
 import json
+import math
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from pathlib import Path
+from uuid import uuid4
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -17,6 +19,7 @@ from nicegui import ui
 from nicegui.events import ValueChangeEventArguments
 
 from hand_technique import HandTechnique
+from symbols import SYMBOLS
 from ai_agent import DivinationAgent, SupportedModels
 from utils.stroke_count import get_stroke_counts
 from utils.calendar_converter import date_to_numbers
@@ -27,6 +30,135 @@ THEME_DIR = Path(__file__).with_name('themes')
 HERO_TITLE = '一念起，观三传。'
 # 五行→CSS 钩子；默认皮肤不使用这些类，仅供主题分色。
 ELEMENT_KEYS = {'木': 'wood', '火': 'fire', '土': 'earth', '金': 'metal', '水': 'water'}
+
+# 三传阶段：完整名与环上记号用的简写。
+PALACE_STAGES = (('初传', '初'), ('中传', '中'), ('末传', '末'))
+PALACE_STAGE_KEYS = ('initial', 'middle', 'final')
+# 环半径（相对正方形容器的百分比）；order=1 在正上方，其余顺时针均分。
+PALACE_RADIUS = 38.0
+
+
+def _palace_coordinates(index: int, count: int) -> tuple[float, float]:
+    """返回节点中心相对容器的 (left%, top%)；index=0 为正上方，顺时针递增。"""
+    angle = math.radians(360.0 * index / count)
+    return round(50.0 + PALACE_RADIUS * math.sin(angle), 3), round(50.0 - PALACE_RADIUS * math.cos(angle), 3)
+
+
+@dataclass(frozen=True)
+class PalaceSegment:
+    """一个输入数字对应的一段数宫轨迹，仅用于展示。"""
+    stage: str
+    short: str
+    number: int
+    start_index: int
+    sequence: tuple
+    visit_counts: tuple
+    landing_index: int
+    moves: int
+    full_cycles: int
+    remainder_steps: int
+
+
+@dataclass(frozen=True)
+class PalaceWalk:
+    """按 order 排序的九宫与三段轨迹；索引指向 palaces。"""
+    palaces: tuple
+    segments: tuple
+
+
+def build_palace_walk(numbers) -> PalaceWalk:
+    """按「本宫算第 1 数」复现 HandTechnique 的计数路径；不修改核心算法，只做展示推导。"""
+    values = validate_numbers(numbers)
+    palaces = tuple(sorted(SYMBOLS, key=lambda symbol: symbol.order))
+    segments = []
+    position = 0
+    for (stage, short), number in zip(PALACE_STAGES, values):
+        sequence = tuple((position + step) % len(palaces) for step in range(number))
+        visit_counts = [0] * len(palaces)
+        for index in sequence:
+            visit_counts[index] += 1
+        landing = sequence[-1]
+        moves = number - 1
+        segments.append(PalaceSegment(
+            stage=stage, short=short, number=number, start_index=position,
+            sequence=sequence, visit_counts=tuple(visit_counts), landing_index=landing,
+            moves=moves, full_cycles=moves // len(palaces), remainder_steps=moves % len(palaces),
+        ))
+        position = landing
+    return PalaceWalk(palaces=palaces, segments=tuple(segments))
+
+
+@dataclass(frozen=True)
+class PalaceHand:
+    """指针只映射既有落点；0°朝上，顺时针旋转。"""
+    stage: str
+    key: str
+    target_index: int
+    target_order: int
+    angle: float
+
+
+def build_palace_hands(walk: PalaceWalk) -> tuple[PalaceHand, ...]:
+    return tuple(
+        PalaceHand(segment.stage, key, segment.landing_index,
+                   walk.palaces[segment.landing_index].order,
+                   segment.landing_index * 360.0 / len(walk.palaces))
+        for key, segment in zip(PALACE_STAGE_KEYS, walk.segments)
+    )
+
+
+@dataclass(frozen=True)
+class PalaceStep:
+    """一次计数（含本宫），重复访问也保留独立的时间窗口。"""
+    stage_index: int
+    count: int
+    palace_index: int
+    start_ms: int
+    end_ms: int
+
+
+@dataclass(frozen=True)
+class PalaceAnimation:
+    steps: tuple[PalaceStep, ...]
+    first_visits: tuple[tuple[Optional[int], ...], ...]
+    landing_ms: tuple[int, ...]
+    relations_ms: int
+
+
+def build_palace_animation(walk: PalaceWalk) -> PalaceAnimation:
+    """只消费既有 sequence，不重新推导宫位；起算 300ms、逐数 160ms、落点 240ms。"""
+    steps, first_visits, landings = [], [], []
+    time_ms = 300
+    for stage_index, segment in enumerate(walk.segments):
+        first = [None] * len(walk.palaces)
+        for count, index in enumerate(segment.sequence, 1):
+            steps.append(PalaceStep(stage_index, count, index, time_ms, time_ms + 160))
+            if first[index] is None:
+                first[index] = time_ms
+            time_ms += 160
+        first_visits.append(tuple(first))
+        landings.append(time_ms)
+        time_ms += 240
+    return PalaceAnimation(tuple(steps), tuple(first_visits), tuple(landings), time_ms)
+
+
+def palace_animation_css(animation: PalaceAnimation, scope: str) -> str:
+    """每宫一条离散透明度时间线；仅接收程序生成的 CSS 标识，不插入用户文本。"""
+    if not re.fullmatch(r'palace-[a-f0-9]+', scope):
+        raise ValueError('无效的九宫动画标识')
+    rules = []
+    for index in range(len(animation.first_visits[0])):
+        frames = {0: 0, animation.relations_ms: 0}
+        for step in animation.steps:
+            if step.palace_index == index:
+                frames[step.start_ms] = 1
+                frames[step.end_ms] = 0
+        keyframes = ' '.join(
+            f'{time_ms / animation.relations_ms * 100:.9f}% {{ opacity: {opacity}; }}'
+            for time_ms, opacity in sorted(frames.items())
+        )
+        rules.append(f'@keyframes {scope}-{index} {{ {keyframes} }}')
+    return '\n'.join(rules)
 
 
 @dataclass(frozen=True)
@@ -64,6 +196,7 @@ class DivinationWebApp:
         self.ai_interpretation = None
         self.input_summary = ''
         self.question_snapshot = ''
+        self.number_snapshot = None
         self.model_select = None
         self.optional_panel = None
         self.input_tabs = None
@@ -115,6 +248,7 @@ class DivinationWebApp:
             self.divination_result = None
             self.ai_interpretation = None
             self.input_summary = ''
+            self.number_snapshot = None
             current_tab = self.input_tabs.value
             question = (self.question_input.value or '').strip()
             self.question_snapshot = question
@@ -135,6 +269,7 @@ class DivinationWebApp:
                 self._show_error(error_msg)
                 return
             self.input_summary = f'{source} · 起课数字：' + '、'.join(map(str, numbers))
+            self.number_snapshot = tuple(numbers)
             result = HandTechnique.predict(*numbers)
             self.divination_result = result
             self._display_results(result.symbols, result.relations, None)
@@ -178,6 +313,8 @@ class DivinationWebApp:
                 if self.question_snapshot:
                     ui.label(f'本次问题：{self.question_snapshot}')
             ui.label('项目九宫法 · 三传表示观察阶段，不对应确定期限。').classes('helper-text')
+            if self.number_snapshot is not None:
+                self._display_palace_ring(build_palace_walk(self.number_snapshot), symbols, relations)
             with ui.element('div').classes('transmission-grid'):
                 for i, (symbol, (stage, hint)) in enumerate(zip(symbols, stages)):
                     element_key = ELEMENT_KEYS.get(symbol.element.name, 'unknown')
@@ -202,6 +339,85 @@ class DivinationWebApp:
                 ui.label('方位与神灵是传统文化象征，不代表现实效果。').classes('helper-text')
         self._display_ai_result(ai_result)
 
+    def _display_palace_ring(self, walk=None, symbols=None, relations=None):
+        """渲染九宫环；无 walk 时为静态空状态，不伪造落点或经过标记。"""
+        palaces = walk.palaces if walk is not None else tuple(sorted(SYMBOLS, key=lambda symbol: symbol.order))
+        visits = [dict() for _ in palaces]
+        landings = [[] for _ in palaces]
+        if walk is not None:
+            for segment_index, segment in enumerate(walk.segments):
+                for index, count in enumerate(segment.visit_counts):
+                    if count:
+                        visits[index][segment.stage] = count
+                landings[segment.landing_index].append((segment_index, segment.stage))
+        animation = build_palace_animation(walk) if walk is not None else None
+        with ui.element('div').classes('palace-ring-block') as block:
+            if animation is not None:
+                scope = f'palace-{uuid4().hex}'
+                block.classes('palace-playing').props(f'data-animation={scope}')
+                block.style(f'--palace-duration:{animation.relations_ms}ms')
+                # 当前 NiceGUI 的 HTML 组件直接设置 innerHTML；style 随结果子树一起销毁。
+                ui.html(palace_animation_css(animation, scope), tag='style').classes('palace-animation-style')
+            ui.label('九宫环 · 顺时针 · 本宫起数').classes('palace-ring-title')
+            with ui.element('div').classes('palace-ring').props('role=group aria-label="九宫环：九个符号按九宫计数顺序顺时针排列"'):
+                ui.element('div').classes('palace-ring-disc').props('aria-hidden=true')
+                if walk is not None:
+                    with ui.element('div').classes('palace-hand-layer').props('aria-hidden=true').style(f'--palace-hand-length:{PALACE_RADIUS}%'):
+                        for stage_index, hand in enumerate(build_palace_hands(walk)):
+                            with ui.element('div').classes(f'palace-hand palace-stage-{hand.key}').props(
+                                    f'data-stage={hand.stage} data-target-index={hand.target_index} data-target-order={hand.target_order}').style(
+                                    f'--palace-hand-angle:{hand.angle}deg;--palace-delay:{animation.landing_ms[stage_index]}ms'):
+                                ui.element('div').classes('palace-hand-line')
+                with ui.element('div').classes('palace-ring-core').props('aria-hidden=true'):
+                    ui.label('顺时针')
+                    ui.label('本宫起数')
+                for index, symbol in enumerate(palaces):
+                    element_key = ELEMENT_KEYS.get(symbol.element.name, 'unknown')
+                    left, top = _palace_coordinates(index, len(palaces))
+                    with ui.element('div').classes('palace-node').props(
+                            f'data-order={symbol.order} data-index={index} data-element={element_key} data-name="{symbol.name}"').style(f'left:{left}%;top:{top}%') as node:
+                        if animation is not None:
+                            node.style(f'--palace-highlight:{scope}-{index}')
+                        ui.label(symbol.name).classes('palace-node-name serif')
+                        ui.label(str(symbol.order)).classes('palace-node-order')
+                        if index == 0:
+                            ui.label('起算').classes('palace-origin')
+                        if walk is not None:
+                            with ui.element('div').classes('palace-visits').props('role=group aria-label="数宫经过标记"'):
+                                for stage_index, (stage, short) in enumerate(PALACE_STAGES):
+                                    count = visits[index].get(stage, 0)
+                                    marker = short if count else ''
+                                    label = f'{stage}经过 {count} 次' if count else f'{stage}未经过'
+                                    chip = ui.label(marker).classes(f'palace-visit palace-stage-{PALACE_STAGE_KEYS[stage_index]}').props(
+                                        f'data-stage={stage} data-visited={"true" if count else "false"} data-count={count} title="{label}"')
+                                    if count:
+                                        chip.style(f'--palace-delay:{animation.first_visits[stage_index][index]}ms')
+                            for segment_index, stage in landings[index]:
+                                landed = symbols[segment_index] if symbols else symbol
+                                landed_key = ELEMENT_KEYS.get(landed.element.name, 'unknown')
+                                ui.label(stage).classes(f'palace-landing palace-stage-{PALACE_STAGE_KEYS[segment_index]}').props(
+                                    f'data-stage={stage} data-element={landed_key} data-finger-position="{landed.finger_position}" data-bagua="{landed.bagua}"').style(f'--palace-delay:{animation.landing_ms[segment_index]}ms')
+            if walk is not None and symbols is not None:
+                with ui.element('div').classes('palace-summaries'):
+                    for segment, symbol in zip(walk.segments, symbols):
+                        element_key = ELEMENT_KEYS.get(symbol.element.name, 'unknown')
+                        with ui.element('div').classes('palace-summary').props(
+                                f'data-stage={segment.stage} data-element={element_key} data-finger-position="{symbol.finger_position}" data-bagua="{symbol.bagua}"'):
+                            with ui.element('div').classes('palace-summary-head'):
+                                ui.label(segment.stage).classes('palace-summary-stage')
+                                ui.label(symbol.name).classes('palace-summary-name serif')
+                            ui.label(f'五行 · {symbol.element.name}').classes(f'palace-element element-{element_key}')
+                            ui.label(f'手指位置：{symbol.finger_position}').classes('palace-meta')
+                            ui.label(f'八卦：{symbol.bagua}').classes('palace-meta')
+                            start_symbol = walk.palaces[segment.start_index]
+                            ui.label(f'{segment.short}数 {segment.number} · 从 {start_symbol.name} 起数 → {segment.stage} {symbol.name}').classes('palace-segment')
+                            ui.label(f'移动 {segment.moves} 步 · 整圈 {segment.full_cycles} · 余 {segment.remainder_steps} 步').classes('palace-segment-meta')
+                with ui.element('div').classes('palace-relations').style(f'--palace-delay:{animation.relations_ms}ms'):
+                    for index, relation in enumerate(relations[:2]):
+                        first, second = symbols[index], symbols[index + 1]
+                        ui.label(f'{walk.segments[index].stage}·{first.name} → {walk.segments[index + 1].stage}·{second.name} · {relation}').classes('palace-relation-title')
+                        ui.label(describe_relation(first, second, relation)).classes('palace-relation-desc helper-text')
+
     def _display_ai_result(self, ai_result):
         if not ai_result:
             return
@@ -216,11 +432,7 @@ class DivinationWebApp:
     def _display_empty_state(self):
         with self.result_area:
             with ui.column().classes('empty-state'):
-                ui.html('''<div class="compass" aria-hidden="true">
-                    <span class="compass-top">起</span><span class="compass-right">承</span>
-                    <span class="compass-bottom">转</span><span class="compass-left">合</span>
-                    <div class="compass-inner"><span>壬</span></div>
-                </div>''')
+                self._display_palace_ring()
                 ui.label('静心一刻，三传待启').classes('serif empty-title')
                 ui.label('在左侧起一课，点「开始占卜」，看看事情的起点、过程与趋势。').classes('empty-copy desktop-copy')
                 ui.label('在上方起一课，点「开始占卜」，看看事情的起点、过程与趋势。').classes('empty-copy mobile-copy')

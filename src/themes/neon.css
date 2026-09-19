@@ -94,6 +94,29 @@ html[data-theme="neon"] .guide-footnote { background: var(--surface-2); border-l
 html[data-theme="neon"] .q-menu { background: #0b0f1f; color: var(--ink); border: 1px solid var(--line); border-radius: 2px; box-shadow: 0 0 24px rgba(34, 227, 255, .15); }
 html[data-theme="neon"] .q-dialog__backdrop { background: rgba(2, 3, 10, .78); }
 html[data-theme="neon"] .q-expansion-item .q-item { color: var(--ink); }
+/* 九宫环 */
+html[data-theme="neon"] .palace-ring-block { --palace-initial-color: #ff83c8; --palace-middle-color: #65e6ff; --palace-final-color: #ffe080; --palace-label-bg: #0a0e1c; --palace-chip-bg: #0a0e1c; --palace-walk-color: var(--accent); --palace-walk-shadow: 0 0 12px rgba(34, 227, 255, .5); }
+html[data-theme="neon"] .palace-ring-title { color: var(--accent); font-family: var(--mono); }
+html[data-theme="neon"] .palace-ring-disc { border-color: var(--line); }
+html[data-theme="neon"] .palace-ring-core { color: var(--muted); font-family: var(--mono); }
+html[data-theme="neon"] .palace-node-name { color: var(--accent); text-shadow: 0 0 10px rgba(34, 227, 255, .5); }
+html[data-theme="neon"] .palace-node-order { color: var(--muted); font-family: var(--mono); }
+html[data-theme="neon"] .palace-origin { background: transparent; color: var(--magenta); box-shadow: inset 0 0 0 1px var(--magenta); border-radius: 2px; }
+html[data-theme="neon"] .palace-visit { border-radius: 2px; background: var(--palace-chip-bg); color: var(--palace-stage-color); box-shadow: inset 0 0 0 1px var(--palace-stage-color); }
+html[data-theme="neon"] .palace-landing { border-radius: 2px; background: var(--palace-chip-bg); color: var(--palace-stage-color); box-shadow: inset 0 0 0 1px var(--palace-stage-color); }
+html[data-theme="neon"] .palace-summary { background: var(--surface); border-color: var(--line); border-top-color: var(--accent); border-radius: 2px; }
+html[data-theme="neon"] .palace-summary-stage { color: #fff; font-family: var(--mono); }
+html[data-theme="neon"] .palace-summary-name { color: var(--accent); text-shadow: 0 0 8px rgba(34, 227, 255, .6); }
+html[data-theme="neon"] .palace-element { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); border-radius: 2px; }
+html[data-theme="neon"] .palace-meta { color: var(--muted); font-family: var(--mono); }
+html[data-theme="neon"] .palace-segment { color: var(--ink); font-family: var(--mono); }
+html[data-theme="neon"] .palace-segment-meta { color: var(--muted); font-family: var(--mono); }
+html[data-theme="neon"] .palace-relation-title { color: var(--magenta); font-family: var(--mono); }
+html[data-theme="neon"] .palace-element[data-element="wood"] { color: var(--el-wood); box-shadow: inset 0 0 0 1px var(--el-wood); }
+html[data-theme="neon"] .palace-element[data-element="fire"] { color: var(--el-fire); box-shadow: inset 0 0 0 1px var(--el-fire); }
+html[data-theme="neon"] .palace-element[data-element="earth"] { color: var(--el-earth); box-shadow: inset 0 0 0 1px var(--el-earth); }
+html[data-theme="neon"] .palace-element[data-element="metal"] { color: var(--el-metal); box-shadow: inset 0 0 0 1px var(--el-metal); }
+html[data-theme="neon"] .palace-element[data-element="water"] { color: var(--el-water); box-shadow: inset 0 0 0 1px var(--el-water); }
 @keyframes neon-crt { 0% { transform: scale(.3, .004); filter: brightness(6); } 40% { transform: scale(1, .006); filter: brightness(4); } 100% { transform: none; filter: none; } }
 @keyframes neon-glitch-a { 0% { transform: translate(-3px, -1px); clip-path: inset(0 0 55% 0); } 50% { transform: translate(3px, 1px); clip-path: inset(12% 0 40% 0); } 100% { transform: translate(-2px, 0); clip-path: inset(4% 0 60% 0); } }
 @keyframes neon-glitch-b { 0% { transform: translate(3px, 1px); clip-path: inset(50% 0 0 0); } 50% { transform: translate(-3px, -1px); clip-path: inset(38% 0 8% 0); } 100% { transform: translate(2px, 0); clip-path: inset(58% 0 2% 0); } }
