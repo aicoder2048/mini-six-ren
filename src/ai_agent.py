@@ -1,6 +1,6 @@
 import os
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from dotenv import load_dotenv
 from pydantic_ai import Agent
 import re
@@ -15,15 +15,15 @@ INTERPRETATION_MAX_TOKENS = 2400
 
 
 class SupportedModels(Enum):
-    """支持的LLM模型枚举"""
-    OPENAI_GPT56 = "openai:gpt-5.6"
+    """支持的LLM模型枚举；排在首位的是默认模型"""
     DEEPSEEK_FLASH = "deepseek:deepseek-flash"  # 指向 DeepSeek-V4.1-Flash
+    OPENAI_GPT61_SOL = "openai:gpt-6.1-sol"
     
     @classmethod
     def get_display_name(cls, model):
         """获取模型的显示名称"""
         names = {
-            cls.OPENAI_GPT56: "OpenAI GPT-5.6",
+            cls.OPENAI_GPT61_SOL: "OpenAI GPT-6.1-Sol",
             cls.DEEPSEEK_FLASH: "DeepSeek Flash"
         }
         return names.get(model, model.value)
@@ -32,7 +32,7 @@ class SupportedModels(Enum):
     def get_api_key_name(cls, model):
         """获取模型对应的API密钥环境变量名"""
         keys = {
-            cls.OPENAI_GPT56: "OPENAI_API_KEY",
+            cls.OPENAI_GPT61_SOL: "OPENAI_API_KEY",
             cls.DEEPSEEK_FLASH: "DEEPSEEK_API_KEY"
         }
         return keys.get(model, "")
@@ -41,18 +41,31 @@ class SupportedModels(Enum):
 @dataclass
 class DivinationDeps:
     """占卜AI依赖数据类"""
-    api_key: str
+    api_key: str = field(repr=False)
     model_type: SupportedModels
 
 
 class DivinationAgent:
     """小六壬占卜AI解读代理"""
     
-    def __init__(self, model_type: SupportedModels = SupportedModels.OPENAI_GPT56):
-        load_dotenv()
+    def __init__(self, model_type: SupportedModels = SupportedModels.DEEPSEEK_FLASH, *, api_key: str | None = None):
+        self._api_key = api_key
         self.model_type = model_type
+        model = model_type.value
+        if api_key is None:
+            load_dotenv()
+        else:
+            # Desktop credentials are request snapshots, not mutable process-wide environment.
+            from pydantic_ai.models.openai import OpenAIModel
+            from pydantic_ai.providers.openai import OpenAIProvider
+            from pydantic_ai.providers.deepseek import DeepSeekProvider
+            if not api_key:
+                raise RuntimeError('所选模型尚未配置 API Key。')
+            provider = (OpenAIProvider(api_key=api_key, base_url='https://api.openai.com/v1')
+                        if model_type is SupportedModels.OPENAI_GPT61_SOL else DeepSeekProvider(api_key=api_key))
+            model = OpenAIModel(model_type.value.split(':', 1)[1], provider=provider)
         self.agent = Agent(
-            model_type.value,
+            model,
             deps_type=DivinationDeps,
             system_prompt=self._get_system_prompt()
         )
@@ -125,7 +138,7 @@ class DivinationAgent:
             str: AI解读结果
         """
         api_key_name = SupportedModels.get_api_key_name(self.model_type)
-        api_key = os.getenv(api_key_name)
+        api_key = self._api_key if self._api_key is not None else os.getenv(api_key_name)
         
         if not api_key:
             model_name = SupportedModels.get_display_name(self.model_type)
@@ -154,7 +167,7 @@ class DivinationAgent:
             str: AI解读结果
         """
         api_key_name = SupportedModels.get_api_key_name(self.model_type)
-        api_key = os.getenv(api_key_name)
+        api_key = self._api_key if self._api_key is not None else os.getenv(api_key_name)
         
         if not api_key:
             model_name = SupportedModels.get_display_name(self.model_type)

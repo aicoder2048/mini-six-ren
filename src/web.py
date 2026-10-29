@@ -55,7 +55,10 @@ DEFAULT_THEME = THEMES[0]
 
 
 class DivinationWebApp:
-    def __init__(self):
+    def __init__(self, *, api_settings=None):
+        self.api_settings = api_settings
+        self.api_settings_panel = None
+        self.model_hint = None
         self.current_model = None
         self.is_running = False
         self.submit_button = None
@@ -74,14 +77,39 @@ class DivinationWebApp:
         self.question_input = None
         self.result_area = None
         self.ai_result_area = None
+        self.reading_tabs = None
+        self.interpretation_status = None
         self.error_message = None
         self.status_message = None
         self._check_available_models()
 
     def _check_available_models(self):
-        self.available_models = DivinationAgent.get_available_models()
-        if self.available_models:
-            self.current_model = self.available_models[0]
+        self.available_models = (self.api_settings.available_models if self.api_settings is not None
+                                 else DivinationAgent.get_available_models())
+        self.current_model = self.available_models[0] if self.available_models else None
+
+    def open_api_settings(self):
+        if self.api_settings_panel is not None:
+            self.api_settings_panel.open()
+
+    def _model_options(self):
+        return {'local': '仅本地计算（不使用AI）'} | {
+            model.value: SupportedModels.get_display_name(model) for model in self.available_models
+        }
+
+    def _optional_caption(self):
+        return '选填 · 填写问题后可获得 AI 解读' if self.available_models else '选填 · 留空只看三传，本地无需 AI'
+
+    def _refresh_ai_options(self):
+        self._check_available_models()
+        self.model_select.set_options(self._model_options(), value=self.current_model.value if self.current_model else 'local')
+        self.optional_panel.props(f'caption="{self._optional_caption()}"')
+        self.optional_panel.set_value(bool(self.available_models))
+        self.model_hint.set_text(self._model_hint_text())
+
+    def _model_hint_text(self):
+        return ('选择 AI 并填写问题后生成解读；问题留空则只计算三传。' if self.available_models
+                else '本地即可查看完整三传，无需 AI。')
 
     def _validate_numbers(self, *values) -> tuple[bool, str, List[int]]:
         try:
@@ -110,7 +138,9 @@ class DivinationWebApp:
         self.status_message.set_text('正在计算本地三传…')
         try:
             self.result_area.clear()
-            self.ai_result_area.clear()
+            self._set_interpretation_status('idle')
+            self._display_ai_placeholder()
+            self.reading_tabs.set_value('observation')
             self.error_message.set_text('')
             self.divination_result = None
             self.ai_interpretation = None
@@ -119,6 +149,7 @@ class DivinationWebApp:
             question = (self.question_input.value or '').strip()
             self.question_snapshot = question
             model = self.current_model
+            api_key = self.api_settings.key_for(model) if self.api_settings is not None and model else None
             if current_tab == 'numbers':
                 valid, error_msg, numbers = self._validate_numbers(*(field.value for field in self.number_inputs))
                 source = '数字模式'
@@ -143,22 +174,33 @@ class DivinationWebApp:
                 model_name = SupportedModels.get_display_name(model)
                 self.submit_button.set_text('正在解读…')
                 self.status_message.set_text(f'本地三传已完成，正在等待 {model_name} 解读…')
+                self._set_interpretation_status('loading')
+                self.ai_result_area.clear()
                 with self.ai_result_area:
-                    with ui.row().classes('items-center gap-3'):
+                    with ui.row().classes('items-center gap-3').props('role=status aria-live=polite'):
                         ui.spinner('dots').props('color=primary')
                         ui.label('本地三传已呈现，AI将结合您的问题解读。')
                 await asyncio.sleep(0)
-                interpretation = await DivinationAgent(model).interpret_prediction_async(result.symbols, question)
+                agent = (DivinationAgent(model, api_key=api_key) if self.api_settings is not None
+                         else DivinationAgent(model))
+                interpretation = await agent.interpret_prediction_async(result.symbols, question)
+                if not interpretation or not interpretation.strip():
+                    raise RuntimeError('未收到解读内容，请重试')
                 self.ai_interpretation = interpretation
                 self.ai_result_area.clear()
                 self._display_ai_result(interpretation)
+                self._set_interpretation_status('ready')
                 self.status_message.set_text('三传与AI解读已完成。修改输入后可再次提交。')
         except Exception as exc:
             self.ai_result_area.clear()
             if self.divination_result is not None:
-                self._show_error(f'AI解读失败：{exc}。本地结果已保留，可再次提交重试。')
+                self._set_interpretation_status('error')
+                detail = '请检查 API Key、网络、余额及模型权限' if self.api_settings is not None else str(exc)
+                self._show_error(f'AI解读失败：{detail}。本地结果已保留，可再次提交重试。')
+                self._display_ai_placeholder('解读失败，本地三传已保留。请查看表单中的错误提示，再次提交重试。')
             else:
                 self._show_error(f'计算失败：{exc}')
+                self._display_ai_placeholder()
         finally:
             self.is_running = False
             self.submit_button.set_text('开始占卜')
@@ -210,8 +252,21 @@ class DivinationWebApp:
             with ui.card().classes('ai-card'):
                 with ui.row().classes('items-center gap-2'):
                     ui.icon('auto_awesome').classes('accent-text')
-                    ui.label('AI 三传解读').classes('serif text-xl')
+                    ui.label('三传解读').classes('serif text-xl')
                 ui.markdown(ai_result).classes('ai-interpretation w-full')
+
+    def _set_interpretation_status(self, state):
+        labels = {'idle': '未生成', 'loading': '解读中…', 'ready': '可查看', 'error': '失败'}
+        self.interpretation_status.set_text(labels[state])
+        self.interpretation_status.props(f'data-state={state}')
+
+    def _display_ai_placeholder(self, message='在「心中所问 · 解读方式」中填写问题并选择可用的 AI 模型，再点「开始占卜」即可在这里查看解读。'):
+        self.ai_result_area.clear()
+        with self.ai_result_area:
+            with ui.column().classes('interpretation-placeholder'):
+                ui.icon('auto_awesome', size='28px').classes('accent-text')
+                ui.label('三传解读').classes('serif text-xl')
+                ui.label(message).classes('helper-text').props('role=status aria-live=polite')
 
     def _display_empty_state(self):
         with self.result_area:
@@ -291,6 +346,8 @@ class DivinationWebApp:
                 with ui.row().classes('header-actions'):
                     ui.label('传统智慧 · 当下启发').classes('header-tagline')
                     self._create_theme_switcher()
+                    if self.api_settings is not None:
+                        ui.button('API 设置', icon='key', on_click=self.open_api_settings).props('flat no-caps').classes('guide-button api-settings-button')
                     ui.button('使用指南', icon='help_outline', on_click=guide.open).props('flat no-caps').classes('guide-button')
 
             with ui.element('main').classes('page-main'):
@@ -336,29 +393,27 @@ class DivinationWebApp:
                         self.submit_button = ui.button('开始占卜', icon='auto_awesome', on_click=self._perform_divination).classes('submit-button').props('unelevated no-caps')
                         self.status_message = ui.label('准备就绪：填写输入后开始占卜。').classes('status-message').props('role=status aria-live=polite')
                         # 选填区：配置了 AI 时默认展开，否则收起，让主按钮留在首屏。
-                        caption = '选填 · 填写问题后可获得 AI 解读' if self.available_models else '选填 · 留空只看三传，本地无需 AI'
-                        self.optional_panel = ui.expansion('心中所问 · 解读方式', caption=caption, icon='edit_note', value=bool(self.available_models)).classes('optional-panel')
+                        self.optional_panel = ui.expansion('心中所问 · 解读方式', caption=self._optional_caption(), icon='edit_note', value=bool(self.available_models)).classes('optional-panel')
                         with self.optional_panel:
                             self.question_input = ui.textarea('想了解的具体问题', placeholder='例如：准备换工作，接下来应先做好哪些准备？').classes('question-field w-full').props('outlined autogrow rows=2 hide-bottom-space')
-                            model_options = {'local': '仅本地计算（不使用AI）'}
-                            model_options.update({model.value: SupportedModels.get_display_name(model) for model in self.available_models})
-                            self.model_select = ui.select(model_options, label='解读方式', value=self.current_model.value if self.current_model else 'local', on_change=self._on_model_change).classes('w-full').props('outlined hide-bottom-space')
-                            if not self.available_models:
-                                with ui.row().classes('local-note'):
-                                    ui.icon('check_circle_outline', size='16px')
-                                    ui.label('本地即可查看完整三传，无需 AI。')
-                            else:
-                                ui.label('选择 AI 并填写问题后生成解读；问题留空则只计算三传。').classes('helper-text')
+                            self.model_select = ui.select(self._model_options(), label='解读方式', value=self.current_model.value if self.current_model else 'local', on_change=self._on_model_change).classes('w-full model-select').props('outlined hide-bottom-space')
+                            self.model_hint = ui.label(self._model_hint_text()).classes('helper-text')
 
                     with ui.element('section').classes('reading-panel').props('aria-label=三传结果'):
                         with ui.row().classes('reading-heading'):
-                            with ui.row().classes('items-center gap-2'):
-                                ui.icon('auto_stories', size='19px')
-                                ui.label('三传观照').classes('reading-heading-title')
+                            with ui.tabs().classes('reading-tabs').props('dense no-caps inline-label align=left') as reading_tabs:
+                                ui.tab('observation', label='三传观照', icon='auto_stories')
+                                with ui.tab('interpretation', label='三传解读', icon='auto_awesome'):
+                                    self.interpretation_status = ui.badge('未生成', color=None).classes('interpretation-status').props('data-state=idle role=status aria-live=polite aria-atomic=true')
+                            self.reading_tabs = reading_tabs
                             ui.label('由始而终，循序而观').classes('reading-heading-note')
-                        self.result_area = ui.column().classes('result-area')
-                        self._display_empty_state()
-                        self.ai_result_area = ui.column().classes('ai-result-area')
+                        with ui.tab_panels(reading_tabs, value='observation', animated=False).classes('reading-panels'):
+                            with ui.tab_panel('observation'):
+                                self.result_area = ui.column().classes('result-area')
+                                self._display_empty_state()
+                            with ui.tab_panel('interpretation'):
+                                self.ai_result_area = ui.column().classes('ai-result-area')
+                                self._display_ai_placeholder()
 
                 with ui.element('section').classes('wisdom-strip'):
                     ui.label('观').classes('serif wisdom-mark').props('aria-hidden=true')
@@ -369,12 +424,21 @@ class DivinationWebApp:
             with ui.element('footer').classes('site-footer'):
                 ui.label('小六壬 · 传统文化探索')
                 ui.label('解读用于梳理思路，现实决定仍需事实依据。')
+        if self.api_settings is not None:
+            from api_settings_ui import APISettingsPanel
+            self.api_settings_panel = APISettingsPanel(
+                self.api_settings, on_saved=self._refresh_ai_options, is_running=lambda: self.is_running,
+            )
+            if self.api_settings.needs_onboarding:
+                self.open_api_settings()
 
 
-def create_page():
+def create_page(*, api_settings=None, show_settings=False):
     """Each page owns its controller and every callback's widget references."""
-    web_app = DivinationWebApp()
+    web_app = DivinationWebApp(api_settings=api_settings)
     web_app.create_ui()
+    if show_settings:
+        web_app.open_api_settings()
     return web_app
 
 

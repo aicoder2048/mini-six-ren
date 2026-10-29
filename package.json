@@ -1,0 +1,61 @@
+{
+  "name": "mini-six-ren-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "小六壬 · 三传 — Electron 桌面版",
+  "author": "Mini Six Ren contributors",
+  "main": "desktop/main.cjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "test": "node --test desktop/tests/*.test.cjs",
+    "test:smoke": "node scripts/smoke_desktop.cjs",
+    "build:backend": "uv run --locked --with pyinstaller==6.22.3 --with pyinstaller-hooks-contrib==2026.9 python scripts/build_desktop_backend.py",
+    "pack": "npm run build:backend && electron-builder --dir",
+    "dist": "npm run build:backend && electron-builder"
+  },
+  "devDependencies": {
+    "electron": "45.1.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.minisixren.desktop",
+    "productName": "小六壬",
+    "asar": true,
+    "directories": {
+      "output": "dist/desktop"
+    },
+    "files": [
+      "desktop/*.cjs",
+      "desktop/startup.html",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/desktop-backend/mini-six-ren-backend",
+        "to": "backend",
+        "filter": ["**/*"]
+      }
+    ],
+    "artifactName": "mini-six-ren-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "category": "public.app-category.lifestyle",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "小六壬"
+    },
+    "linux": {
+      "category": "Utility",
+      "target": ["AppImage", "deb"]
+    }
+  }
+}
