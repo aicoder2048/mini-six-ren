@@ -5,6 +5,11 @@
   "credential_scan": "passed; no .env, personal configuration, or build output copied",
   "files": [
     {
+      "path": ".gitattributes",
+      "sha256": "4d319f833bdfc9af22e7f507ae299337273c50de27a6f2c3555f00c6ba9a3675",
+      "bytes": 207
+    },
+    {
       "path": ".github/workflows/windows-build.yml",
       "sha256": "b5f776a90ea46d4fedb7ce807d256253b3c3025f343b555b1a154606c596e299",
       "bytes": 7081
