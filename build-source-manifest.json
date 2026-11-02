@@ -1,6 +1,6 @@
 {
   "base_commit": "a7c655aee10602865bb23a2835e20f5ecf722537",
-  "branch": "build/windows-x64-20261101-203412",
+  "branch": "build/windows-x64-20261101-215434",
   "snapshot_kind": "allowlisted current working-tree application and tests",
   "credential_scan": "passed; no .env, personal configuration, or build output copied",
   "files": [
@@ -157,17 +157,17 @@
     {
       "path": "package-lock.json",
       "bytes": 127145,
-      "sha256": "ab042e9b77bf8b25d91835a6d0a6132c14d8042f575c9715f6b598632c7550bf"
+      "sha256": "adcd50f92e719a73b3d6e3cfe7e1f887cfde4d65120d9cc06b78a9ab010d6ab6"
     },
     {
       "path": "package.json",
       "bytes": 1635,
-      "sha256": "30c89d4185cdac4b7494d5613ae91dfaf83d47dae6f5ead601a7db4390a70d85"
+      "sha256": "41298b677774a0ae1c47d1dd7aee59af3ef57e414c6bee7dea25de67a27ba9db"
     },
     {
       "path": "pyproject.toml",
       "bytes": 307,
-      "sha256": "417a406166a27104f60388bf007c8a1e2ca307068c6a24f64280ac3c42beb8b1"
+      "sha256": "aa98c1fa21bcf6dbe73a5536cb8996850100f7dc51e529a195698caf0a70dfdd"
     },
     {
       "path": "scripts/build_desktop_backend.py",
@@ -392,7 +392,7 @@
     {
       "path": "uv.lock",
       "bytes": 211853,
-      "sha256": "32931bdc94b9fc6333a2857b30c27e8858de34ed671b3da6fd3b2f4e3e6ac93f"
+      "sha256": "387d2fe18505f9e65860e18a2489546514abb64047bf80f8f01e0e3494acc45a"
     }
   ]
 }
