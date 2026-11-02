@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+  <title>小六壬 · 三传</title>
+  <style>
+    body { margin: 0; height: 100vh; display: grid; place-items: center; background: #f7f4ed; color: #302e29; font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+    main { text-align: center; }
+    .seal { display: inline-grid; place-items: center; width: 64px; height: 64px; border: 1px solid #a34432; border-radius: 12px; color: #a34432; font: 38px serif; }
+    h1 { font: 30px 'Songti SC', 'SimSun', serif; margin-top: 28px; letter-spacing: .1em; }
+    p { color: #777269; font-size: 14px; line-height: 1.8; }
+    .line { width: 120px; height: 2px; margin: 28px auto; background: #ded7cc; overflow: hidden; }
+    .line::after { content: ''; display: block; width: 45px; height: 100%; background: #a34432; animation: loading 1.4s ease-in-out infinite alternate; }
+    @keyframes loading { to { transform: translateX(75px); } }
+    @media (prefers-reduced-motion: reduce) { .line::after { animation: none; width: 100%; } }
+  </style>
+</head>
+<body><main aria-live="polite"><div class="seal" aria-hidden="true">壬</div><h1>一念起，观三传。</h1><p>正在准备本地计算服务…<br>首次启动可能需要片刻，无需打开浏览器。</p><div class="line" aria-hidden="true"></div></main></body>
+</html>

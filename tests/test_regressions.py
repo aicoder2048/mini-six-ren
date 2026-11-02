@@ -2,6 +2,7 @@ import sys
 import unittest
 import asyncio
 import io
+import os
 import subprocess
 import tempfile
 from datetime import date, timedelta
@@ -172,33 +173,28 @@ class ReviewRegressions(unittest.TestCase):
 
 
 class WebRegressions(unittest.IsolatedAsyncioTestCase):
-    async def test_cli_stream_does_not_clear_local_prediction(self):
-        from contextlib import asynccontextmanager
+    async def test_failed_generation_does_not_print_partial_output_or_clear_local_prediction(self):
         from types import SimpleNamespace
-        from ai_agent import DivinationAgent, DivinationDeps, SupportedModels
+        from ai_agent import DivinationAgent, SupportedModels
+        from reading import ReadingSession
         from rich.console import Console
 
-        class Stream:
-            async def stream_text(self):
-                yield 'partial interpretation'
-                raise RuntimeError('simulated stream outage')
-
-        @asynccontextmanager
-        async def run_stream(*args, **kwargs):
-            yield Stream()
-
         agent = DivinationAgent.__new__(DivinationAgent)
-        agent.model_type = SupportedModels.OPENAI_GPT56
-        agent.agent = SimpleNamespace(run_stream=run_stream)
+        agent.model_type = SupportedModels.OPENAI_GPT61_SOL
+        agent._api_key = 'offline-secret'
+        agent.agent = SimpleNamespace(run=AsyncMock(side_effect=RuntimeError('partial interpretation offline-secret')))
         output = io.StringIO()
         console = Console(file=output)
         console.print('LOCAL PREDICTION')
-        with patch('ai_agent.Console', return_value=console), \
-             patch.object(console, 'clear') as clear:
-            with self.assertRaisesRegex(RuntimeError, 'simulated stream outage'):
-                await agent._stream_interpretation('test', DivinationDeps('unused', agent.model_type))
+        session = ReadingSession.start(HandTechnique.predict(1, 2, 3), 'test')
+        with patch.object(console, 'clear') as clear:
+            with self.assertRaisesRegex(RuntimeError, 'AI解读失败') as raised:
+                await agent.interpret_prediction_async(session)
             clear.assert_not_called()
+        self.assertNotIn('offline-secret', str(raised.exception))
         self.assertIn('LOCAL PREDICTION', output.getvalue())
+        self.assertNotIn('partial interpretation', output.getvalue())
+        self.assertIsNone(session.reading)
 
     async def test_web_modes_and_invalid_input_recovery(self):
         from nicegui import Client, ui
@@ -256,12 +252,12 @@ class WebRegressions(unittest.IsolatedAsyncioTestCase):
         from web import create_page
         entered, release = asyncio.Event(), asyncio.Event()
 
-        async def failing_ai(*args):
+        async def failing_ai(*args, **kwargs):
             entered.set()
             await release.wait()
             raise RuntimeError('simulated outage')
 
-        with patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT56]), \
+        with patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT61_SOL]), \
              patch('web.DivinationAgent.__init__', return_value=None), \
              patch('web.DivinationAgent.interpret_prediction_async', side_effect=failing_ai) as ai:
             with Client(ui.page('/ai-failure'), request=None):
@@ -275,7 +271,8 @@ class WebRegressions(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(ai.await_count, 1)
                 release.set()
                 await task
-                self.assertIn('simulated outage', app.error_message.text)
+                self.assertNotIn('simulated outage', app.error_message.text)
+                self.assertIn('失败', app.error_message.text)
                 self.assertTrue(app.result_area.default_slot.children)
                 self.assertFalse(app.is_running)
                 self.assertTrue(app.submit_button.enabled)
@@ -284,7 +281,7 @@ class WebRegressions(unittest.IsolatedAsyncioTestCase):
         from nicegui import Client, ui
         from ai_agent import SupportedModels
         from web import create_page
-        for models, expanded in [([], False), ([SupportedModels.OPENAI_GPT56], True)]:
+        for models, expanded in [([], False), ([SupportedModels.OPENAI_GPT61_SOL], True)]:
             with self.subTest(models=models), patch('web.DivinationAgent.get_available_models', return_value=models):
                 with Client(ui.page(f'/optional-{expanded}'), request=None):
                     app = create_page()
@@ -300,7 +297,7 @@ class WebRegressions(unittest.IsolatedAsyncioTestCase):
         from ai_agent import SupportedModels
         from types import SimpleNamespace
         from web import create_page
-        with patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT56]), \
+        with patch('web.DivinationAgent.get_available_models', return_value=[SupportedModels.OPENAI_GPT61_SOL]), \
              patch('web.DivinationAgent.interpret_prediction_async', new_callable=AsyncMock) as ai:
             with Client(ui.page('/skip-ai'), request=None):
                 app = create_page()
@@ -312,5 +309,15 @@ class WebRegressions(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(app.divination_result, HandTechnique.predict(1, 2, 3))
 
 
+class DefaultModelTests(unittest.TestCase):
+    def test_deepseek_is_default_and_listed_first_when_both_keys_set(self):
+        from ai_agent import DivinationAgent, SupportedModels
+        keys = {'DEEPSEEK_API_KEY': 'offline-test', 'OPENAI_API_KEY': 'offline-test'}
+        with patch.dict(os.environ, keys), patch('ai_agent.load_dotenv'):
+            self.assertEqual(DivinationAgent().model_type, SupportedModels.DEEPSEEK_FLASH)
+            self.assertEqual(DivinationAgent.get_available_models()[0], SupportedModels.DEEPSEEK_FLASH)
+
+
 if __name__ == '__main__':
     unittest.main()
+

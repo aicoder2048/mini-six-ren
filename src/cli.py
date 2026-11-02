@@ -1,5 +1,6 @@
 from hand_technique import HandTechnique
 from ai_agent import DivinationAgent, SupportedModels
+from reading import ReadingSession, MAX_SUPPLEMENTS
 from five_elements import FIVE_ELEMENTS
 from utils.calendar_converter import solar_to_lunar, lunar_to_solar, date_to_numbers
 from utils.stroke_count import get_stroke_counts, format_stroke_count_output
@@ -374,7 +375,7 @@ def tools_submenu():
         elif sub_choice == 5:
             lunar_to_solar_conversion()
 
-def display_divination_result(table, interpretation):
+def display_divination_result(table):
     console = Console()
     
     # 让Rich按面板内部可用宽度排列表格，避免边框挤压文字。
@@ -383,12 +384,56 @@ def display_divination_result(table, interpretation):
     # 显示占卜结果表格，修改标题
     console.print(Panel(table, title="求问占卜", expand=False, width=console_width))
     
-    if interpretation:
-        # 创建一个文本对象来显示解释
-        interpretation_text = Text(interpretation, style="cyan")
-        
-        # 显示解释面板，宽度与表格相同
-        console.print(Panel(interpretation_text, title="AI三传解读", border_style="magenta", expand=True, width=console_width))
+
+def print_reading(session: ReadingSession):
+    reading = session.reading
+    console.print(Panel(Text(reading.answer), title='三传解读'))
+    console.print(Text('下一步', style='bold'))
+    for i, action in enumerate(reading.actions, 1):
+        console.print(Text(f'{i}. {action}'))
+    if reading.caution:
+        console.print(Panel(Text(reading.caution), title='必要提醒', border_style='yellow'))
+    if reading.follow_up:
+        console.print(Text(reading.follow_up))
+    console.print(Text('三传依据 · 象征解释', style='bold'))
+    console.print(Text(reading.rationale))
+    console.print(Text('本地事实', style='bold'))
+    for stage, fact in zip(('初传', '中传', '末传'), session.snapshot.transmissions):
+        console.print(Text(f'{stage} · {fact.name} · {fact.element} · {fact.keywords}\n{fact.meaning}'))
+    for stage, fact in zip(('初传→中传', '中传→末传'), session.snapshot.relations):
+        console.print(Text(f'{stage} · {fact.name} · {fact.explanation}'))
+
+
+def run_reading_session(session: ReadingSession, model: SupportedModels):
+    pending = None
+    while True:
+        try:
+            with console.status('正在生成解读…'):
+                candidate = DivinationAgent(model).interpret_prediction(session, supplement=pending)
+        except Exception:
+            message = ('补充解读失败，已有解读已保留。' if session.reading is not None
+                       else 'AI解读失败，本地结果已保留。')
+            console.print(Text(message + '请检查 API Key、网络、余额及模型权限。', style='red'))
+            choice = Prompt.ask('r 重试本次输入 / b 返回', choices=['r', 'b'], default='b')
+            if choice == 'b':
+                return session
+            continue
+        session = candidate
+        pending = None
+        print_reading(session)
+        if len(session.supplements) >= MAX_SUPPLEMENTS:
+            console.print(Text('本次已补充5次，请返回后重新起课。'))
+            return session
+        while True:
+            choice = Prompt.ask('s 补充情况 / b 返回', choices=['s', 'b'], default='b')
+            if choice == 'b':
+                return session
+            pending = Prompt.ask('补充情况（最多1000字）', default=pending or '')
+            try:
+                session.validate_supplement(pending)
+                break
+            except ValueError as exc:
+                console.print(Text(str(exc), style='red'))
 
 console = Console()
 
@@ -401,6 +446,7 @@ def validate_chinese_chars(chars_input):
 def main():
     clear_screen()
     display_colorful_title()
+    console.print(Text('传统文化探索。解读用于梳理思路，现实决定仍需事实依据。'))
     
     while True:
         console.print("\n")
@@ -477,15 +523,12 @@ def xiaoliu_submenu():
             console.print(Text(f'本次输入：{"".join(chars)}（字典笔画）'))
         console.print(f'起课数字：{num1}、{num2}、{num3}')
         result = HandTechnique.predict(num1, num2, num3)
-        display_divination_result(format_prediction(result), None)
+        display_divination_result(format_prediction(result))
         if selected_model is not None:
             question = Prompt.ask('[bold cyan]请描述求问事项（留空跳过AI）[/bold cyan]', default='').strip()
             if question:
-                try:
-                    interpretation = DivinationAgent(selected_model).interpret_prediction(result.symbols, question)
-                    console.print(Panel(Text(interpretation), title='AI三传解读'))
-                except Exception as exc:
-                    console.print(f'[red]AI解读失败：{exc}[/red]')
+                session = ReadingSession.start(result, question)
+                run_reading_session(session, selected_model)
 
 
 def set_current_working_dir():

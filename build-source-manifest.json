@@ -1,0 +1,398 @@
+{
+  "base_commit": "a7c655aee10602865bb23a2835e20f5ecf722537",
+  "branch": "build/windows-x64-20261101-203412",
+  "snapshot_kind": "allowlisted current working-tree application and tests",
+  "credential_scan": "passed; no .env, personal configuration, or build output copied",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "bytes": 207,
+      "sha256": "4d319f833bdfc9af22e7f507ae299337273c50de27a6f2c3555f00c6ba9a3675"
+    },
+    {
+      "path": ".github/workflows/windows-build.yml",
+      "bytes": 7081,
+      "sha256": "b5f776a90ea46d4fedb7ce807d256253b3c3025f343b555b1a154606c596e299"
+    },
+    {
+      "path": "data/bagua.json",
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "path": "data/celestial_stems_earthly_branches.json",
+      "bytes": 53,
+      "sha256": "9eb784c5a7587f34f28f95333a5b1525ce03c23ee7e6cc95e7417bf27b0a9486"
+    },
+    {
+      "path": "data/five_elements.json",
+      "bytes": 6354,
+      "sha256": "f92444ab337bd9a5e41d4de9340fd83e5d47649b465f5292264009deab72bb0c"
+    },
+    {
+      "path": "data/hanzi_dictionary.txt",
+      "bytes": 1440898,
+      "sha256": "e5cc711ff013668dda7c084f204ea769e9ffa070cf0b803042de245069071a0e"
+    },
+    {
+      "path": "data/symbols.json",
+      "bytes": 3982,
+      "sha256": "905732b23dcb8f93d3b860aff6cad3b6940056879f8d0aaa667feac6f6ecabe9"
+    },
+    {
+      "path": "data/太岁_丑牛.json",
+      "bytes": 8625,
+      "sha256": "7013742fbbb4232e18e4a8e5e4349624564debe856874d773243067be6f84237"
+    },
+    {
+      "path": "data/太岁_亥猪.json",
+      "bytes": 7025,
+      "sha256": "697e82a167b2ccbd3bfae54f634dc4f77f1e3922751441ed3274aca0694990dd"
+    },
+    {
+      "path": "data/太岁_午马.json",
+      "bytes": 9072,
+      "sha256": "a8b188a3e2cef23e4788f7816841dc0d1c287169216274c20db9010ab616b7a5"
+    },
+    {
+      "path": "data/太岁_卯兔.json",
+      "bytes": 5239,
+      "sha256": "2ba46b5356ac7b73c88524a747125fdc6300f113b4e2196afc542dbc2ce9d22c"
+    },
+    {
+      "path": "data/太岁_子鼠.json",
+      "bytes": 6850,
+      "sha256": "72f0a45a53272519d822d34bfe2761967a057ba6b6a943aea7c8314d6520c1e1"
+    },
+    {
+      "path": "data/太岁_寅虎.json",
+      "bytes": 8964,
+      "sha256": "fb5bbff5e0244769bd49d678b2bdb625ee1607ce8d303d85fe68702a9dc21931"
+    },
+    {
+      "path": "data/太岁_巳蛇.json",
+      "bytes": 9184,
+      "sha256": "a9034c2810d7a54e84cf1430e6ccfb4feb5666d759d7a9a4d612812b1095046f"
+    },
+    {
+      "path": "data/太岁_戌狗.json",
+      "bytes": 7094,
+      "sha256": "53754769a730afa02b399809e6311993e517a04bc3ef27783334299e05762adb"
+    },
+    {
+      "path": "data/太岁_未羊.json",
+      "bytes": 6217,
+      "sha256": "4984d54e6456b2c8d23a84ddf3495eab5e11b07c74c489f50f469259c265a90d"
+    },
+    {
+      "path": "data/太岁_申猴.json",
+      "bytes": 5783,
+      "sha256": "3b50237a5f17fa8d30718ac6f1bb85d8d2510e06a4e3c04b6db61ef2162a0c3b"
+    },
+    {
+      "path": "data/太岁_辰龙.json",
+      "bytes": 5878,
+      "sha256": "11de7cf7cf4870c94a684ff8ddf17b6ea647910ab19aedb5ae2988670e59bf05"
+    },
+    {
+      "path": "data/太岁_酉鸡.json",
+      "bytes": 5747,
+      "sha256": "d1186a7258cccecce9e3c4ad597a7a9124b055ce2f29176a9ecc004715bf8c48"
+    },
+    {
+      "path": "desktop/backend.cjs",
+      "bytes": 4181,
+      "sha256": "20960714f051175dae6669b1699686b0526229fc0de95aacd8d7e645663d799d"
+    },
+    {
+      "path": "desktop/backend.spec",
+      "bytes": 1317,
+      "sha256": "5026244fed6262697dc6373ea0cf953d5ea890f6afc9be674030820d5e9658e4"
+    },
+    {
+      "path": "desktop/main.cjs",
+      "bytes": 9342,
+      "sha256": "46f91a354d6f38f7c9f564a0d8ed5a82c7de1ec48f5b6d95bfcce4a90443395c"
+    },
+    {
+      "path": "desktop/preload.cjs",
+      "bytes": 1672,
+      "sha256": "98d3e5eef15f352c9d6fd7fabbbb404af6f021c525fd7eeea0c0a1cd5183d0a1"
+    },
+    {
+      "path": "desktop/reports.cjs",
+      "bytes": 4679,
+      "sha256": "02d64ac1d42314a0531bfac7b45e8581d055c1c0819a7cca6d180a77ffc9b0ec"
+    },
+    {
+      "path": "desktop/security.cjs",
+      "bytes": 515,
+      "sha256": "3ad170c633babee1174b3667fd408626ae8c4e37abf6a9c28b0bb3d75cc02629"
+    },
+    {
+      "path": "desktop/startup.html",
+      "bytes": 1462,
+      "sha256": "1a349e592635e8cd76093b5a8502b44802e3cb88566c0e8894dfc4d9f1e0dac5"
+    },
+    {
+      "path": "desktop/tests/backend.test.cjs",
+      "bytes": 3896,
+      "sha256": "e957d4d335c0951c6fdedccde0ffd30262688ff92069728695726025f271aadb"
+    },
+    {
+      "path": "desktop/tests/fixtures/backend.cjs",
+      "bytes": 790,
+      "sha256": "7728b17c77272ba03ba92dbf471620ad1d598cea84e86808162eaaaca5f20ec3"
+    },
+    {
+      "path": "desktop/tests/report-bridge.test.cjs",
+      "bytes": 3548,
+      "sha256": "67692d698a0efeb72f8e2673415c4957fcc47eab9af0cb0c25f33f785ab506e4"
+    },
+    {
+      "path": "desktop/tests/reports.test.cjs",
+      "bytes": 4035,
+      "sha256": "22689474a2a2465e05c0fb94c9eaf38a3f72b55bca4940b075da4e6e55841502"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 127145,
+      "sha256": "ab042e9b77bf8b25d91835a6d0a6132c14d8042f575c9715f6b598632c7550bf"
+    },
+    {
+      "path": "package.json",
+      "bytes": 1635,
+      "sha256": "30c89d4185cdac4b7494d5613ae91dfaf83d47dae6f5ead601a7db4390a70d85"
+    },
+    {
+      "path": "pyproject.toml",
+      "bytes": 307,
+      "sha256": "417a406166a27104f60388bf007c8a1e2ca307068c6a24f64280ac3c42beb8b1"
+    },
+    {
+      "path": "scripts/build_desktop_backend.py",
+      "bytes": 981,
+      "sha256": "c9e5d1eee64c7075c545e9f99fa25a826ad60f6d51b30e5bb253aff0ed40a2d3"
+    },
+    {
+      "path": "scripts/smoke_desktop.cjs",
+      "bytes": 17677,
+      "sha256": "8c31c2cd6aa2e3427007b5dc3f6a696540ceda1ccd47575cefd54358f2d38d5c"
+    },
+    {
+      "path": "src/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/ai_agent.py",
+      "bytes": 11257,
+      "sha256": "325ba273116e8dadcc45c8aeccd2b2e60d45062cd0fd5a841890dfc9474a39a2"
+    },
+    {
+      "path": "src/api_settings_ui.py",
+      "bytes": 5812,
+      "sha256": "69d8bf210787eef06626e9a709e9fa75a7ea1f5dfa6d2c3fe993875f4b3b51bb"
+    },
+    {
+      "path": "src/bagua.py",
+      "bytes": 638,
+      "sha256": "23005dae704058d565d7908e41e01468ce8d389016d4e81ee0cda0878ac19611"
+    },
+    {
+      "path": "src/celestial_stems_earthly_branches.py",
+      "bytes": 799,
+      "sha256": "748511fc064db52c6c189d17a12b96907a034911a0778746bb520ba9c0e3e900"
+    },
+    {
+      "path": "src/cli.py",
+      "bytes": 24988,
+      "sha256": "48847d9853092e02598906b92a0a1e85d7a7ed2e9163284b87d339d094019019"
+    },
+    {
+      "path": "src/desktop_server.py",
+      "bytes": 3581,
+      "sha256": "fe3d18097d5797b9a00c3d38d4a80f707d3d82ad7589e86e70b60696058d7e18"
+    },
+    {
+      "path": "src/five_elements.py",
+      "bytes": 1038,
+      "sha256": "15f26339441a7a8bcdfda53de60f0cb2b197b1c6b223993a04913bf9b5cebd9b"
+    },
+    {
+      "path": "src/hand_technique.py",
+      "bytes": 738,
+      "sha256": "facd222b8f8706eee56b6c269eaff7f47f6ab1452ce428f8b5caa6b792f8a61f"
+    },
+    {
+      "path": "src/reading.css",
+      "bytes": 8690,
+      "sha256": "7af069c48f70e97bd2d0cf07d867b8f9f45ef4a1d1f60f4f157f1b67f61acc01"
+    },
+    {
+      "path": "src/reading.py",
+      "bytes": 3321,
+      "sha256": "c6e729a0d4e29453eb59d445fffde60124df5c633572a03df45317b643372e2f"
+    },
+    {
+      "path": "src/reports.py",
+      "bytes": 9171,
+      "sha256": "48b93d950a1c8e363031dea6295390d0ab247275ece673b845e979739e1bac47"
+    },
+    {
+      "path": "src/symbols.py",
+      "bytes": 931,
+      "sha256": "9a9430fc1eea7d1f7b9875cf71273932cec36a92693a71c331b728d25a435e84"
+    },
+    {
+      "path": "src/themes/ink.css",
+      "bytes": 11392,
+      "sha256": "62ce86c5dccc1dc735df2c5d9dd4bf39452bdc46149e96c1462fc4681c1f7839"
+    },
+    {
+      "path": "src/themes/neon.css",
+      "bytes": 15293,
+      "sha256": "bc2847479616a6d5e1b7247e9ed502cc2d2ce20469895733ebb88bcd5315ac48"
+    },
+    {
+      "path": "src/themes/night.css",
+      "bytes": 9932,
+      "sha256": "b17190d38fec036472bfc13f913902b7bf3657e6f614f499be7c19e9f94f1918"
+    },
+    {
+      "path": "src/themes/theme.js",
+      "bytes": 7072,
+      "sha256": "bb6be83a7c802fbb273de32d355933184e483cb460313515ed797d3d11dff905"
+    },
+    {
+      "path": "src/utils/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "src/utils/api_settings.py",
+      "bytes": 4631,
+      "sha256": "8809179717eec52b62f7e12f6d6fcc16b3dffd2f89202ab12ba7e2a7dd843507"
+    },
+    {
+      "path": "src/utils/bazi_calculator.py",
+      "bytes": 2274,
+      "sha256": "9dedeacc25ccf339d0db14683c7221306976901c1d83b4aadc3b716ea9db3ef9"
+    },
+    {
+      "path": "src/utils/calendar_converter.py",
+      "bytes": 3521,
+      "sha256": "486999ff142505297cc14260a4f7d332868b28ed700644c717394d946a13967b"
+    },
+    {
+      "path": "src/utils/five_elements_utils.py",
+      "bytes": 5325,
+      "sha256": "8492a188525a54bf489ff4591459aa1622e12195466618b23bf6b64a8d7a1033"
+    },
+    {
+      "path": "src/utils/stroke_count.py",
+      "bytes": 1390,
+      "sha256": "ac025bf6654f5789a613be653c8a9328ebe0f0622d5d2770c4c64ae66dd168f6"
+    },
+    {
+      "path": "src/utils/symbol_relations.py",
+      "bytes": 1323,
+      "sha256": "3943032f60603401ed272cdf6e1dc362b9cc0209c324aba9da50ffcfad9d1e88"
+    },
+    {
+      "path": "src/utils/validation.py",
+      "bytes": 2116,
+      "sha256": "455c857745199dcad741d3793c151661a499779cdff3ac6078a48ebfcd800ba0"
+    },
+    {
+      "path": "src/web.css",
+      "bytes": 19464,
+      "sha256": "4ce097f44166f9baa2cefd4176b0acee67043dde2c4fe66779ad204f28e7a122"
+    },
+    {
+      "path": "src/web.py",
+      "bytes": 41369,
+      "sha256": "fad89190a3239ffa522a68aee06d68e44bbe0f0c1f1b586d87f1535a3b0638fc"
+    },
+    {
+      "path": "tests/reading_fixtures.py",
+      "bytes": 1166,
+      "sha256": "57ffe0fafdddd75079434a43795f0a1ce27a2cb426a2b346a782117e44f53bfe"
+    },
+    {
+      "path": "tests/test_api_settings.py",
+      "bytes": 14004,
+      "sha256": "1ef4f986a7e936b4a8f6c61cd5d246a08e63d60b0251f5549d6ff3bc3f665552"
+    },
+    {
+      "path": "tests/test_desktop_server.py",
+      "bytes": 7446,
+      "sha256": "691bb916f7f5597b280d0e4b4285f202a3a59785a91bc8be170322f7bc6c49c4"
+    },
+    {
+      "path": "tests/test_interpretation_experience.py",
+      "bytes": 8944,
+      "sha256": "18a5013385b6f6845eac09bdd97bc72439dfa5289e5113e62f57df1ae2b557e7"
+    },
+    {
+      "path": "tests/test_layered_agent.py",
+      "bytes": 8816,
+      "sha256": "3917a614c526768e7f785dc8068594b85fb18358d17c08358c32b66186c53b55"
+    },
+    {
+      "path": "tests/test_layered_cli.py",
+      "bytes": 5088,
+      "sha256": "6e4a07e65d3192d302cfc350ef6ca1acfc4c5bed41f1fb8b3f8953077c853070"
+    },
+    {
+      "path": "tests/test_layered_web.py",
+      "bytes": 10187,
+      "sha256": "ac35cdbe5012990cd3349d964bcd4ec0c474c17224910de49d7f51c6ccf5cee8"
+    },
+    {
+      "path": "tests/test_live_providers.py",
+      "bytes": 1853,
+      "sha256": "db441b6355f065222360ee9143d82b7c3a517163e605de4438e3fc7b62a618a5"
+    },
+    {
+      "path": "tests/test_reading_contract.py",
+      "bytes": 6589,
+      "sha256": "44ed4259eeafa0acc9a07154f3b6c897657f378c08ed7dc244d588f914e30c1a"
+    },
+    {
+      "path": "tests/test_reading_design.py",
+      "bytes": 4840,
+      "sha256": "dc202d57be03d1c702ebf2ed776d6d9cf2f63c4103522c21c4b2aff3f4d68142"
+    },
+    {
+      "path": "tests/test_reading_tabs.py",
+      "bytes": 9248,
+      "sha256": "b47c240beaa472cc3f3966cdd265f47e9ded2ef8119876cd7ca71d4c13cc2415"
+    },
+    {
+      "path": "tests/test_regressions.py",
+      "bytes": 17324,
+      "sha256": "f8f5ea36345f340b1bbdbe0a6e5e1bc023e27f5e3845ec6f8728d3b54b504cc7"
+    },
+    {
+      "path": "tests/test_report_ui.py",
+      "bytes": 5989,
+      "sha256": "5f51f90a6d4c267dfdc47aa35326dc33b96de3b788914f83319f57e34da4e699"
+    },
+    {
+      "path": "tests/test_reports.py",
+      "bytes": 3516,
+      "sha256": "a0c723e9f72b5ce07e67de9322a90e77e20df2672e3f61f07507ff840928ee1b"
+    },
+    {
+      "path": "tests/test_web_themes.py",
+      "bytes": 10479,
+      "sha256": "d644b7193d797c88a39a6d133ad94856676f65448d21404cfc4cc526ddfdfcd6"
+    },
+    {
+      "path": "uv.lock",
+      "bytes": 211853,
+      "sha256": "32931bdc94b9fc6333a2857b30c27e8858de34ed671b3da6fd3b2f4e3e6ac93f"
+    }
+  ]
+}

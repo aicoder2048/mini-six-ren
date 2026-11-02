@@ -1,0 +1,10 @@
+# Keep text bytes stable across macOS and Windows for build manifest verification.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.zip binary
+*.dmg binary
+*.exe binary

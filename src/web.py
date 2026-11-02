@@ -5,7 +5,7 @@ import os
 import re
 import sys
 import json
-import asyncio
+from uuid import uuid4
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -18,6 +18,7 @@ from nicegui.events import ValueChangeEventArguments
 
 from hand_technique import HandTechnique
 from ai_agent import DivinationAgent, SupportedModels
+from reading import ReadingSession, MAX_SUPPLEMENTS
 from utils.stroke_count import get_stroke_counts
 from utils.calendar_converter import date_to_numbers
 from utils.validation import validate_numbers, validate_chinese
@@ -55,13 +56,29 @@ DEFAULT_THEME = THEMES[0]
 
 
 class DivinationWebApp:
-    def __init__(self):
+    def __init__(self, *, api_settings=None, desktop=False):
+        self.desktop = desktop
+        self.report_button = None
+        self.report_options = []
+        self.report_status = None
+        self.is_exporting = False
+        self.api_settings = api_settings
+        self.api_settings_panel = None
+        self.model_hint = None
         self.current_model = None
         self.is_running = False
         self.submit_button = None
         self.available_models = []
         self.divination_result = None
-        self.ai_interpretation = None
+        self.reading_session = None
+        self.supplement_area = None
+        self.supplement_form = None
+        self.supplement_input = None
+        self.supplement_button = None
+        self.supplement_status = None
+        self.supplement_error = None
+        self.follow_up_label = None
+        self.retry_button = None
         self.input_summary = ''
         self.question_snapshot = ''
         self.model_select = None
@@ -74,14 +91,39 @@ class DivinationWebApp:
         self.question_input = None
         self.result_area = None
         self.ai_result_area = None
+        self.reading_tabs = None
+        self.interpretation_status = None
         self.error_message = None
         self.status_message = None
         self._check_available_models()
 
     def _check_available_models(self):
-        self.available_models = DivinationAgent.get_available_models()
-        if self.available_models:
-            self.current_model = self.available_models[0]
+        self.available_models = (self.api_settings.available_models if self.api_settings is not None
+                                 else DivinationAgent.get_available_models())
+        self.current_model = self.available_models[0] if self.available_models else None
+
+    def open_api_settings(self):
+        if self.api_settings_panel is not None:
+            self.api_settings_panel.open()
+
+    def _model_options(self):
+        return {'local': '仅本地计算（不使用AI）'} | {
+            model.value: SupportedModels.get_display_name(model) for model in self.available_models
+        }
+
+    def _optional_caption(self):
+        return '选填 · 填写问题后可获得 AI 解读' if self.available_models else '选填 · 留空只看三传，本地无需 AI'
+
+    def _refresh_ai_options(self):
+        self._check_available_models()
+        self.model_select.set_options(self._model_options(), value=self.current_model.value if self.current_model else 'local')
+        self.optional_panel.props(f'caption="{self._optional_caption()}"')
+        self.optional_panel.set_value(bool(self.available_models))
+        self.model_hint.set_text(self._model_hint_text())
+
+    def _model_hint_text(self):
+        return ('选择 AI 并填写问题后生成解读；问题留空则只计算三传。' if self.available_models
+                else '本地即可查看完整三传，无需 AI。')
 
     def _validate_numbers(self, *values) -> tuple[bool, str, List[int]]:
         try:
@@ -104,21 +146,26 @@ class DivinationWebApp:
     async def _perform_divination(self):
         if self.is_running:
             return
-        self.is_running = True
-        self.submit_button.disable()
+        self._set_running(True)
         self.submit_button.set_text('正在计算…')
         self.status_message.set_text('正在计算本地三传…')
         try:
             self.result_area.clear()
-            self.ai_result_area.clear()
+            self._set_interpretation_status('idle')
+            self._display_ai_placeholder()
+            self.reading_tabs.set_value('observation')
             self.error_message.set_text('')
             self.divination_result = None
-            self.ai_interpretation = None
+            self.reading_session = None
+            self.supplement_input.set_value('')
+            self.supplement_error.set_text('')
+            self._sync_reading_controls()
             self.input_summary = ''
             current_tab = self.input_tabs.value
             question = (self.question_input.value or '').strip()
             self.question_snapshot = question
             model = self.current_model
+            api_key = self.api_settings.key_for(model) if self.api_settings is not None and model else None
             if current_tab == 'numbers':
                 valid, error_msg, numbers = self._validate_numbers(*(field.value for field in self.number_inputs))
                 source = '数字模式'
@@ -137,34 +184,181 @@ class DivinationWebApp:
             self.input_summary = f'{source} · 起课数字：' + '、'.join(map(str, numbers))
             result = HandTechnique.predict(*numbers)
             self.divination_result = result
-            self._display_results(result.symbols, result.relations, None)
+            self._display_results(result.symbols, result.relations)
             self.status_message.set_text('本地三传已完成。选择AI并填写问题，可再次提交获取解读。')
             if model is not None and question:
-                model_name = SupportedModels.get_display_name(model)
-                self.submit_button.set_text('正在解读…')
-                self.status_message.set_text(f'本地三传已完成，正在等待 {model_name} 解读…')
-                with self.ai_result_area:
+                self.reading_session = ReadingSession.start(result, question)
+                await self._generate_reading(self.reading_session, model, api_key)
+        except Exception:
+            self._show_error('计算失败，请检查输入后重试。')
+            self._display_ai_placeholder()
+        finally:
+            self._set_running(False)
+
+    def _set_running(self, running):
+        self.is_running = running
+        self.submit_button.set_enabled(not running)
+        if not running:
+            self.submit_button.set_text('开始占卜')
+        self.ai_result_area.props(f'aria-busy={str(running).lower()}')
+        self._sync_reading_controls()
+
+    def _sync_reading_controls(self):
+        session = self.reading_session
+        ready = session is not None and session.reading is not None
+        self.supplement_area.set_visibility(session is not None)
+        self.supplement_form.set_visibility(ready)
+        self.retry_button.set_visibility(session is not None and not ready)
+        self.retry_button.set_enabled(not self.is_running)
+        count = len(session.supplements) if session else 0
+        self.supplement_button.set_enabled(not self.is_running and ready and count < MAX_SUPPLEMENTS)
+        self.supplement_input.set_enabled(not self.is_running and count < MAX_SUPPLEMENTS)
+        self.follow_up_label.set_text((session.reading.follow_up or '') if ready else '')
+        self.follow_up_label.set_visibility(ready and bool(session.reading.follow_up))
+        self.supplement_status.set_text(
+            '补充解读中…' if self.is_running and ready else
+            ('已补充5/5次，请重新起课。' if count >= MAX_SUPPLEMENTS else f'已补充{count}/5次，每次最多1000字。')
+        )
+        self.supplement_area.props(f'aria-busy={str(self.is_running).lower()}')
+        self._sync_report_controls()
+
+    async def _retry_reading(self):
+        base = self.reading_session
+        if self.is_running or base is None or base.reading is not None:
+            return
+        await self._update_reading(base)
+
+    async def _submit_supplement(self):
+        base = self.reading_session
+        if self.is_running or base is None or base.reading is None:
+            return
+        supplement = self.supplement_input.value or ''
+        try:
+            base.validate_supplement(supplement)
+        except ValueError as exc:
+            self.supplement_error.set_text(str(exc))
+            return
+        await self._update_reading(base, supplement=supplement)
+
+    async def _update_reading(self, base, *, supplement=None):
+        self._set_running(True)
+        try:
+            model = self.current_model
+            api_key = self.api_settings.key_for(model) if self.api_settings is not None and model else None
+            await self._generate_reading(base, model, api_key, supplement=supplement)
+        finally:
+            self._set_running(False)
+
+    async def _generate_reading(self, base, model, api_key, *, supplement=None):
+        initial = base.reading is None
+        self.supplement_error.set_text('')
+        if initial:
+            self.error_message.set_text('')
+            self._set_interpretation_status('loading')
+            self.submit_button.set_text('正在解读…')
+            self.status_message.set_text('本地三传已完成，正在等待 AI 解读…')
+            self.ai_result_area.clear()
+            with self.ai_result_area:
+                with ui.column().classes('reading-loading').props('role=status aria-live=polite'):
+                    ui.label('三传已成 · 正在研读').classes('reading-kicker')
+                    ui.label('循三传，理清所问。').classes('serif reading-loading-title')
                     with ui.row().classes('items-center gap-3'):
                         ui.spinner('dots').props('color=primary')
-                        ui.label('本地三传已呈现，AI将结合您的问题解读。')
-                await asyncio.sleep(0)
-                interpretation = await DivinationAgent(model).interpret_prediction_async(result.symbols, question)
-                self.ai_interpretation = interpretation
-                self.ai_result_area.clear()
-                self._display_ai_result(interpretation)
-                self.status_message.set_text('三传与AI解读已完成。修改输入后可再次提交。')
-        except Exception as exc:
-            self.ai_result_area.clear()
-            if self.divination_result is not None:
-                self._show_error(f'AI解读失败：{exc}。本地结果已保留，可再次提交重试。')
+                        ui.label('本地三传已呈现，AI将结合您的问题生成完整解读。').classes('helper-text')
+                    ui.label('可切换「三传观照」核对本地结果，无需重复起课。').classes('helper-text')
+        self._sync_reading_controls()
+        try:
+            if model is None:
+                raise RuntimeError('请先选择可用的 AI 模型。')
+            agent = (DivinationAgent(model, api_key=api_key) if self.api_settings is not None
+                     else DivinationAgent(model))
+            candidate = await agent.interpret_prediction_async(base, supplement=supplement)
+        except Exception:
+            if self.reading_session is not base:
+                return
+            if initial:
+                self._set_interpretation_status('error')
+                self._show_error('AI解读失败，请检查 API Key、网络、余额及模型权限。本地结果已保留。')
+                self._display_ai_placeholder('解读失败，本地三传已保留。可点击「重试解读」，沿用本次问题与三传。')
             else:
-                self._show_error(f'计算失败：{exc}')
-        finally:
-            self.is_running = False
-            self.submit_button.set_text('开始占卜')
-            self.submit_button.enable()
+                self.supplement_error.set_text('补充解读失败，已有解读已保留。请检查模型设置后重试，输入不会清空。')
+            return
+        if self.reading_session is not base:
+            return
+        self.reading_session = candidate
+        self._display_ai_result(candidate)
+        if supplement is not None:
+            self.supplement_input.set_value('')
+        self._set_interpretation_status('ready')
+        self.status_message.set_text('三传与AI解读已完成。可补充情况，或修改输入后重新起课。')
+        self._sync_reading_controls()
 
-    def _display_results(self, symbols, relations, ai_result):
+    def _sync_report_controls(self):
+        if self.report_button is None:
+            return
+        enabled = self.divination_result is not None and not self.is_running and not self.is_exporting
+        self.report_button.set_enabled(enabled)
+        for option in self.report_options:
+            option.set_enabled(enabled)
+
+    async def _export_report(self, variant):
+        if (not self.desktop or self.is_running or self.is_exporting
+                or self.divination_result is None or variant not in ('print', 'wechat')):
+            return
+        from reports import render_report
+        self.is_exporting = True
+        self._sync_report_controls()
+        self.report_status.set_text('请选择 PDF 保存位置…')
+        try:
+            html = render_report(self.divination_result, variant=variant,
+                                 input_summary=self.input_summary, question=self.question_snapshot,
+                                 session=self.reading_session)
+            payload = json.dumps({'variant': variant, 'html': html, 'request_id': uuid4().hex}, ensure_ascii=True)
+            result = await ui.run_javascript(f'''return await new Promise(resolve => {{
+                const payload = {payload};
+                let timer;
+                const finish = event => {{
+                    let result;
+                    try {{ result = JSON.parse(event.detail); }} catch {{ return; }}
+                    if (!result || result.request_id !== payload.request_id) return;
+                    clearTimeout(timer);
+                    window.removeEventListener('msr:report-result', finish);
+                    resolve(result);
+                }};
+                window.addEventListener('msr:report-result', finish);
+                timer = setTimeout(() => {{
+                    window.removeEventListener('msr:report-result', finish);
+                    resolve({{status: 'error'}});
+                }}, 590000);
+                window.dispatchEvent(new CustomEvent('msr:export-report', {{ detail: JSON.stringify(payload) }}));
+            }});''', timeout=600)
+            status = result.get('status') if isinstance(result, dict) else 'error'
+            messages = {'saved': 'PDF 报告已保存。', 'cancelled': '已取消保存，结果未改变。',
+                        'busy': '已有报告正在导出，请稍后重试。'}
+            message = messages.get(status, '报告保存失败，请检查保存位置、权限或磁盘空间后重试。')
+            if isinstance(result, dict) and result.get('code') == 'layout':
+                message = '当前内容无法排入可读的 A4 单页，请选择微信版保留完整内容。'
+            self.report_status.set_text(message)
+        except Exception:
+            self.report_status.set_text('报告导出失败，请重试。已有结果未改变。')
+        finally:
+            self.is_exporting = False
+            self._sync_report_controls()
+
+    def _create_report_menu(self):
+        with ui.column().classes('report-tools items-end gap-1'):
+            self.report_button = ui.button('报告', icon='description').props('outline no-caps').classes('report-button')
+            with self.report_button, ui.menu().props('auto-close'):
+                self.report_options = [
+                    ui.menu_item('打印版 · A4 单页 PDF', on_click=lambda: self._export_report('print')),
+                    ui.menu_item('微信版 · 手机多页 PDF', on_click=lambda: self._export_report('wechat')),
+                ]
+                ui.separator()
+                ui.label('打印版为摘要；微信版保留完整内容。').classes('text-xs q-pa-sm')
+            self.report_status = ui.label('').classes('helper-text report-status').props('role=status aria-live=polite')
+        self._sync_report_controls()
+
+    def _display_results(self, symbols, relations):
         self.result_area.clear()
         stages = [('初传｜起点', '眼下的基础与切入点'),
                   ('中传｜过程', '推进中的变化与牵制'),
@@ -200,18 +394,70 @@ class DivinationWebApp:
                     ui.label(f'{stage} · {symbol.name} · 方位：{symbol.direction} · 神灵：{symbol.deity}').classes('culture-title')
                     ui.label(symbol.deity_description).classes('helper-text mb-3')
                 ui.label('方位与神灵是传统文化象征，不代表现实效果。').classes('helper-text')
-        self._display_ai_result(ai_result)
 
-    def _display_ai_result(self, ai_result):
-        if not ai_result:
-            return
+    def _display_ai_result(self, session: ReadingSession):
+        reading = session.reading
         self.ai_result_area.clear()
         with self.ai_result_area:
-            with ui.card().classes('ai-card'):
-                with ui.row().classes('items-center gap-2'):
-                    ui.icon('auto_awesome').classes('accent-text')
-                    ui.label('AI 三传解读').classes('serif text-xl')
-                ui.markdown(ai_result).classes('ai-interpretation w-full')
+            with ui.card().classes('ai-card reading-brief'):
+                with ui.element('header').classes('reading-brief-header'):
+                    with ui.row().classes('reading-brief-topline'):
+                        ui.label('三传研判 / AI READING').classes('reading-kicker')
+                        ui.label(f'第 {len(session.supplements)} 次补充' if session.supplements else '初次解读').classes('reading-edition')
+                    ui.label('三传解读').classes('serif reading-brief-title').props('role=heading aria-level=2')
+                    ui.label(session.snapshot.question).classes('reading-question')
+                    with ui.element('div').classes('reading-transmission-axis').props('role=group aria-label=本次三传与关系'):
+                        for i, (stage, fact) in enumerate(zip(('初传 · 起点', '中传 · 过程', '末传 · 趋势'), session.snapshot.transmissions)):
+                            with ui.column().classes('reading-axis-stage'):
+                                ui.label(stage).classes('reading-axis-label')
+                                with ui.row().classes('reading-axis-symbol'):
+                                    ui.label(fact.name).classes('serif')
+                                    ui.label(fact.element).classes('reading-axis-element')
+                            if i < 2:
+                                with ui.column().classes('reading-axis-link'):
+                                    ui.label(session.snapshot.relations[i].name)
+                                    ui.icon('east').props('aria-hidden=true')
+                with ui.element('div').classes('reading-brief-body'):
+                    with ui.element('section').classes('reading-verdict').props('aria-label=核心判断'):
+                        ui.label('核心判断').classes('reading-section-title reading-section-label')
+                        ui.label(reading.answer).classes('reading-text reading-answer ai-interpretation')
+                    with ui.element('section').classes('reading-actions').props('aria-label=下一步'):
+                        ui.label('下一步').classes('reading-section-title reading-section-label')
+                        ui.label('把判断落到行动').classes('reading-action-intro')
+                        with ui.element('ol').classes('reading-action-list'):
+                            for i, action in enumerate(reading.actions, 1):
+                                with ui.element('li').classes('reading-action-item'):
+                                    ui.label(f'{i:02}').classes('reading-action-number').props('aria-hidden=true')
+                                    ui.label(action).classes('reading-text reading-action')
+                if reading.caution:
+                    with ui.column().classes('reading-caution').props('role=note aria-label=必要提醒'):
+                        ui.label('必要提醒').classes('reading-section-title')
+                        ui.label(reading.caution).classes('reading-text')
+                with ui.expansion('查看三传依据', caption='核对本地事实与象征解释', icon='account_tree', value=False).classes('reading-rationale w-full'):
+                    ui.label('象征解释').classes('reading-section-title')
+                    ui.label(reading.rationale).classes('reading-text')
+                    ui.label('本地事实 · 不随解读改变').classes('reading-section-title')
+                    for stage, fact in zip(('初传', '中传', '末传'), session.snapshot.transmissions):
+                        ui.label(f'{stage} · {fact.name} · {fact.element}').classes('reading-fact')
+                    for stage, fact in zip(('初传→中传', '中传→末传'), session.snapshot.relations):
+                        ui.label(f'{stage} · {fact.name} · {fact.explanation}').classes('reading-fact reading-text')
+
+    def _set_interpretation_status(self, state):
+        labels = {'idle': '未生成', 'loading': '解读中…', 'ready': '可查看', 'error': '失败'}
+        self.interpretation_status.set_text(labels[state])
+        self.interpretation_status.props(f'data-state={state}')
+
+    def _display_ai_placeholder(self, message='在「心中所问 · 解读方式」中填写问题并选择可用的 AI 模型，再点「开始占卜」即可在这里查看解读。'):
+        self.ai_result_area.clear()
+        with self.ai_result_area:
+            with ui.column().classes('interpretation-placeholder'):
+                ui.label('解').classes('serif reading-emblem').props('aria-hidden=true')
+                ui.label('由象入理，由理而行').classes('reading-kicker')
+                ui.label('三传解读').classes('serif reading-placeholder-title')
+                ui.label(message).classes('helper-text').props('role=status aria-live=polite')
+                with ui.row().classes('reading-placeholder-guide').props('aria-hidden=true'):
+                    for title in ('回应所问', '明确行动', '追溯依据'):
+                        ui.label(title)
 
     def _display_empty_state(self):
         with self.result_area:
@@ -269,6 +515,7 @@ class DivinationWebApp:
         ui.colors(primary='#a34432', secondary='#69755e', negative='#b33c32')
         ui.add_css(Path(__file__).with_name('web.css'))
         self._add_theme_assets()
+        ui.add_css(Path(__file__).with_name('reading.css'))
         with ui.dialog() as guide, ui.card().classes('guide-dialog'):
             ui.label('从一问，到三传').classes('serif text-2xl')
             for title, copy in [
@@ -278,7 +525,6 @@ class DivinationWebApp:
             ]:
                 ui.label(title).classes('font-semibold mt-3')
                 ui.label(copy).classes('helper-text')
-            ui.label('本工具采用项目九宫法。解读用于梳理思路，现实决定仍需事实依据。').classes('guide-footnote')
             ui.button('开始探索', on_click=guide.close).props('unelevated no-caps').classes('self-end')
 
         with ui.column().classes('app-shell'):
@@ -291,6 +537,8 @@ class DivinationWebApp:
                 with ui.row().classes('header-actions'):
                     ui.label('传统智慧 · 当下启发').classes('header-tagline')
                     self._create_theme_switcher()
+                    if self.api_settings is not None:
+                        ui.button('API 设置', icon='key', on_click=self.open_api_settings).props('flat no-caps').classes('guide-button api-settings-button')
                     ui.button('使用指南', icon='help_outline', on_click=guide.open).props('flat no-caps').classes('guide-button')
 
             with ui.element('main').classes('page-main'):
@@ -336,29 +584,43 @@ class DivinationWebApp:
                         self.submit_button = ui.button('开始占卜', icon='auto_awesome', on_click=self._perform_divination).classes('submit-button').props('unelevated no-caps')
                         self.status_message = ui.label('准备就绪：填写输入后开始占卜。').classes('status-message').props('role=status aria-live=polite')
                         # 选填区：配置了 AI 时默认展开，否则收起，让主按钮留在首屏。
-                        caption = '选填 · 填写问题后可获得 AI 解读' if self.available_models else '选填 · 留空只看三传，本地无需 AI'
-                        self.optional_panel = ui.expansion('心中所问 · 解读方式', caption=caption, icon='edit_note', value=bool(self.available_models)).classes('optional-panel')
+                        self.optional_panel = ui.expansion('心中所问 · 解读方式', caption=self._optional_caption(), icon='edit_note', value=bool(self.available_models)).classes('optional-panel')
                         with self.optional_panel:
                             self.question_input = ui.textarea('想了解的具体问题', placeholder='例如：准备换工作，接下来应先做好哪些准备？').classes('question-field w-full').props('outlined autogrow rows=2 hide-bottom-space')
-                            model_options = {'local': '仅本地计算（不使用AI）'}
-                            model_options.update({model.value: SupportedModels.get_display_name(model) for model in self.available_models})
-                            self.model_select = ui.select(model_options, label='解读方式', value=self.current_model.value if self.current_model else 'local', on_change=self._on_model_change).classes('w-full').props('outlined hide-bottom-space')
-                            if not self.available_models:
-                                with ui.row().classes('local-note'):
-                                    ui.icon('check_circle_outline', size='16px')
-                                    ui.label('本地即可查看完整三传，无需 AI。')
-                            else:
-                                ui.label('选择 AI 并填写问题后生成解读；问题留空则只计算三传。').classes('helper-text')
+                            self.model_select = ui.select(self._model_options(), label='解读方式', value=self.current_model.value if self.current_model else 'local', on_change=self._on_model_change).classes('w-full model-select').props('outlined hide-bottom-space')
+                            self.model_hint = ui.label(self._model_hint_text()).classes('helper-text')
 
                     with ui.element('section').classes('reading-panel').props('aria-label=三传结果'):
                         with ui.row().classes('reading-heading'):
-                            with ui.row().classes('items-center gap-2'):
-                                ui.icon('auto_stories', size='19px')
-                                ui.label('三传观照').classes('reading-heading-title')
-                            ui.label('由始而终，循序而观').classes('reading-heading-note')
-                        self.result_area = ui.column().classes('result-area')
-                        self._display_empty_state()
-                        self.ai_result_area = ui.column().classes('ai-result-area')
+                            with ui.tabs().classes('reading-tabs').props('dense no-caps inline-label align=left') as reading_tabs:
+                                ui.tab('observation', label='三传观照', icon='auto_stories')
+                                with ui.tab('interpretation', label='三传解读', icon='auto_awesome'):
+                                    self.interpretation_status = ui.badge('未生成', color=None).classes('interpretation-status').props('data-state=idle role=status aria-live=polite aria-atomic=true')
+                            self.reading_tabs = reading_tabs
+                            if self.desktop:
+                                self._create_report_menu()
+                            else:
+                                ui.label('由始而终，循序而观').classes('reading-heading-note')
+                        with ui.tab_panels(reading_tabs, value='observation', animated=False).classes('reading-panels'):
+                            with ui.tab_panel('observation'):
+                                self.result_area = ui.column().classes('result-area')
+                                self._display_empty_state()
+                            with ui.tab_panel('interpretation'):
+                                self.ai_result_area = ui.column().classes('ai-result-area')
+                                self._display_ai_placeholder()
+                                with ui.column().classes('supplement-area') as self.supplement_area:
+                                    self.retry_button = ui.button('重试解读', on_click=self._retry_reading).props('outline no-caps')
+                                    with ui.column().classes('supplement-form') as self.supplement_form:
+                                        with ui.row().classes('reading-supplement-heading'):
+                                            ui.icon('forum', size='18px').props('aria-hidden=true')
+                                            ui.label('同课追问').classes('serif')
+                                            ui.label('沿用三传，不重新起课').classes('helper-text')
+                                        self.follow_up_label = ui.label('').classes('reading-text reading-follow-up')
+                                        self.supplement_input = ui.textarea('补充情况（沿用本次三传）', placeholder='可回答上方问题，或更正、补充背景。').classes('w-full').props('outlined autogrow rows=2')
+                                        self.supplement_status = ui.label('').classes('helper-text').props('role=status aria-live=polite')
+                                        self.supplement_button = ui.button('补充解读', on_click=self._submit_supplement).props('outline no-caps')
+                                    self.supplement_error = ui.label('').classes('error-message').props('role=alert')
+                                self._sync_reading_controls()
 
                 with ui.element('section').classes('wisdom-strip'):
                     ui.label('观').classes('serif wisdom-mark').props('aria-hidden=true')
@@ -369,12 +631,21 @@ class DivinationWebApp:
             with ui.element('footer').classes('site-footer'):
                 ui.label('小六壬 · 传统文化探索')
                 ui.label('解读用于梳理思路，现实决定仍需事实依据。')
+        if self.api_settings is not None:
+            from api_settings_ui import APISettingsPanel
+            self.api_settings_panel = APISettingsPanel(
+                self.api_settings, on_saved=self._refresh_ai_options, is_running=lambda: self.is_running,
+            )
+            if self.api_settings.needs_onboarding:
+                self.open_api_settings()
 
 
-def create_page():
+def create_page(*, api_settings=None, show_settings=False, desktop=False):
     """Each page owns its controller and every callback's widget references."""
-    web_app = DivinationWebApp()
+    web_app = DivinationWebApp(api_settings=api_settings, desktop=desktop)
     web_app.create_ui()
+    if show_settings:
+        web_app.open_api_settings()
     return web_app
 
 
